@@ -1,35 +1,25 @@
 {
-  "name": "Azure Architecture Sentinel",
+  "name": "Azure Architecture Agent",
   "build": {
     "dockerfile": "Dockerfile",
     "context": ".."
   },
   "features": {
-    "ghcr.io/devcontainers/features/azure-cli:1": {},
-    "ghcr.io/devcontainers-contrib/features/azure-functions-core-tools:1": {
-        "version": "4"
-    },
-    "ghcr.io/devcontainers/features/terraform:1": {
-        "version": "latest",
-        "tflint": "latest"
-    }
+    "ghcr.io/devcontainers/features/common-utils:2.5.7": {}
   },
   "customizations": {
     "vscode": {
       "settings": {
-        "python.defaultInterpreterPath": "/workspace/.venv/bin/python",
-        "python.analysis.extraPaths": ["/workspace/src"]
+        "python.defaultInterpreterPath": ".venv/bin/python"
       },
       "extensions": [
         "ms-python.python",
         "ms-azuretools.vscode-azurefunctions",
-        "ms-azuretools.vscode-bicep",
         "hashicorp.terraform",
         "charliermarsh.ruff"
       ]
     }
   },
-  "postCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh | sh && source $HOME/.cargo/env && uv venv && uv sync",
   "remoteUser": "vscode",
   "forwardPorts": [7071]
 }

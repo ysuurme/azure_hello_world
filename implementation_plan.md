@@ -42,6 +42,13 @@ The design adheres to the provided rules:
 
 ---
 
+### Phase 1.5: Frontend Validation (MVA)
+*Status: In Progress. Focus: Visualizing the Agent output locally.*
+
+#### [NEW] `src/ui/`
+- **Architecture**: Documented in `docs/architectures/local/001_mva_local_setup.md`.
+- **Implementation**: A lightweight Streamlit app (`src/ui/app.py`) running within the unified container to validate the end-to-end flow visually.
+
 ### Phase 2: Infrastructure Provisioning 
 *Focus: Security, Network mapping, and Terraform Enterprise Blueprints.*
 

@@ -9,13 +9,19 @@
 - [x] Implement `src/utils/tools.py` (Live Azure Retail Prices API logic for `calculate_cost`).
 - [x] Write Unit Tests for tools mirroring local expected outputs.
 
+## Phase 1.5: Frontend Validation (MVA)
+- [x] Create `docs/architectures/local/001_mva_local_setup.md` to document the local container setup.
+- [x] Implement `src/ui/app.py` (Streamlit UI) - *Restructured*.
+- [x] Create `.devcontainer/Dockerfile` (Unified Container).
+- [ ] Run and validate the unified container.
+
 ## Phase 2: Infrastructure Provisioning & Environment Setup
 - [x] Configure `.devcontainer/devcontainer.json` for reproducible Azure Functions and Terraform execution.
 - [ ] Outline `infra/main.tf` logic for AI Search, Capability Host, and AI Foundry connections (Entra ID).
 - [ ] Provision VNet and Private endpoints configurations in Terraform.
 
 ## Phase 3: Containerization & Deployment
-- [ ] Build `Dockerfile` utilizing UV.
+- [x] Build `Dockerfile` utilizing UV.
 - [ ] Enforce `DefaultAzureCredential` across all python connection clients.
 
 ## Phase 4: Continuous Evaluation
