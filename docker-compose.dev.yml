@@ -1,0 +1,15 @@
+# Development compose file for local container validation with live-reload.
+# Usage: docker compose -f docker-compose.dev.yml up --build
+services:
+  sentinel:
+    build: .
+    ports:
+      - "7071:7071"
+      - "8501:8501"
+    volumes:
+      - ./src:/app/src
+      - ./pyproject.toml:/app/pyproject.toml
+      - ./uv.lock:/app/uv.lock
+    env_file: .env
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1

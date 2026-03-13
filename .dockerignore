@@ -2,10 +2,16 @@
 .venv
 .vscode
 .devcontainer
+.gemini
+.agents
 __pycache__
 .pytest_cache
 *.pyc
 .env
+.env.example
 infra
 tests
 architecture
+docker-compose*.yml
+*.md
+!README.md

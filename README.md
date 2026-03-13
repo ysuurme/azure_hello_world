@@ -1,6 +1,6 @@
-# Azure Architecture Sentinel
+# Azure Architecture Agent
 
-The **Azure Architecture Sentinel** is a Technical Design Authority (TDA) Agent. It moves past simple "Chat-over-PDF" patterns into Agentic Retrieval-Augmented Generation (RAG). The system actively reasons across the Microsoft Well-Architected Framework (WAF) and private repository notes to balance structural resiliency with cost-efficiency.
+The **Azure Architecture Agent** is a Technical Design Authority (TDA) Agent. It moves past simple "Chat-over-PDF" patterns into Agentic Retrieval-Augmented Generation (RAG). The system actively reasons across the Microsoft Well-Architected Framework (WAF) and private repository notes to balance structural resiliency with cost-efficiency.
 
 ## Project Structure & Focus
 This project utilizes **Azure AI Foundry** (for Agent Orchestration) and **Azure AI Search** (for Vector Store tracking). It serves as a multi-week roadmap aimed at mastering the transition from deterministic procedural logic to the non-deterministic reasoning flows of the 2026 AI-native ecosystem.
@@ -20,28 +20,45 @@ This project utilizes **Azure AI Foundry** (for Agent Orchestration) and **Azure
 - **Idempotency**: Ingestion enforces SHA-256 hash checks with Azure AI Document Intelligence before vector mapping.
 - **Agentic RAG**: Multi-query pipelines via `azure-ai-projects` rather than single-vector retrieval.
 
-## Local Development Requirements (Rancher Desktop + WSL)
-Instead of installing complex Python and Azure dependencies on your host Windows machine, this project uses a fully isolated **VS Code Devcontainer**.
+## Local Development
 
 ### Prerequisites
-1. **Rancher Desktop**: Installed and running on your Windows machine.
-   - Go to *Preferences > Container Engine* and ensure **dockerd (moby)** is selected (not containerd).
-   - Ensure the WSL integration is enabled for your default WSL distro.
-2. **VS Code**: Installed with the `Dev Containers` extension (by Microsoft).
+- **Python 3.10+** installed on your Windows host
+- **UV** package manager (`pip install uv` or [standalone installer](https://docs.astral.sh/uv/getting-started/installation/))
+- **Rancher Desktop** (optional, for container validation) — set to **dockerd (moby)** engine
 
-### Running Locally
-1. Clone the repository and open the folder in VS Code.
-2. VS Code should prompt you to "Reopen in Container". If not, press `Ctrl+Shift+P`, type `Dev Containers: Reopen in Container`, and select it.
-3. The container will build (downloading Python, Azure CLI, Azure Functions Core Tools, and Terraform).
-4. **Validation**: Once inside the container, open a new VS Code terminal. The `uv venv` and `uv sync` commands will have run automatically. 
-   - Start the local Azure Functions server:
-     ```bash
-     cd src && PYTHONPATH=".." func start
-     ```
-   - In a second terminal, trigger the Sentinel Agent with a dummy payload:
-     ```bash
-     curl -X POST http://localhost:7071/api/AdvisorTrigger \
-          -H "Content-Type: application/json" \
-          -d '{"query": "Evaluating the cost impact of moving to a multi-region App Service with Azure Front Door."}'
-     ```
-   - You should see the HTTP 200 response with the calculated Trade-off Matrix!
+### Native Development (Daily Workflow)
+
+Run everything from your host `.venv` via UV. No containers needed.
+
+```powershell
+# 1. Install / sync dependencies
+uv sync --frozen
+
+# 2. Start the Streamlit UI (port 8501)
+uv run streamlit run src/ui/app.py --server.port 8501
+
+# 3. In a second terminal — start the Azure Functions host (port 7071)
+cd src; $env:PYTHONPATH=".."; uv run func start --port 7071
+
+# 4. Run tests
+uv run pytest tests/ -v
+```
+
+### Container Validation (Rancher Desktop)
+
+Validate the production-parity Docker image locally with live-reload.
+
+```powershell
+# 1. Copy the environment template and fill in your values
+cp .env.example .env
+
+# 2. Build and run with live-reload volume mounts
+docker compose -f docker-compose.dev.yml up --build
+```
+
+- **Streamlit UI**: http://localhost:8501
+- **Azure Functions**: http://localhost:7071/api/ArchitectureAdvisorTrigger
+- Edit files under `src/` — changes appear in the container automatically.
+
+> **Note:** A `.devcontainer/` configuration is included for contributors who prefer a fully containerised IDE experience. It is not required for daily development.

@@ -1,29 +1,42 @@
 # Project Setup: Azure Architecture Sentinel
 
 ## Phase 1: Local Development & SpecKit (Completed)
-- [x] Rename existing `MyHobbyAgent` to `AdvisorTrigger`.
-- [x] Implement `src/agents/arch_advisor.py` (Maker-Checker prompts, Tool Binding).
-- [x] Implement `src/utils/agent_factory.py` (Local Client initialization).
-- [x] Implement `src/utils/ingestion.py` (Document ID hashing, Azure Document Intelligence structure).
-- [x] Implement `src/utils/search_helpers.py` (`knowledge_base_retrieve` logic).
-- [x] Implement `src/utils/tools.py` (Live Azure Retail Prices API logic for `calculate_cost`).
-- [x] Write Unit Tests for tools mirroring local expected outputs.
+- [x] Rename existing `MyHobbyAgent` to `AdvisorTrigger`
+- [x] Implement `src/agents/arch_advisor.py`
+- [x] Implement `src/utils/agent_factory.py`
+- [x] Implement `src/utils/ingestion.py`
+- [x] Implement `src/utils/search_helpers.py`
+- [x] Implement `src/utils/tools.py`
+- [x] Write Unit Tests
 
-## Phase 1.5: Frontend Validation (MVA)
-- [x] Create `docs/architectures/local/001_mva_local_setup.md` to document the local container setup.
-- [x] Implement `src/ui/app.py` (Streamlit UI) - *Restructured*.
-- [x] Create `.devcontainer/Dockerfile` (Unified Container).
-- [/] Run and validate the unified container (pytest 5/5 passed, Docker build pending).
+## Phase 1.5: Frontend Validation (MVA) — Completed
+- [x] Architecture doc `001_mva_local_setup.md`
+- [x] Implement `src/ui/app.py` (Streamlit)
+- [x] `.devcontainer/Dockerfile`
+- [x] Pytest 5/5 passed
 
-## Phase 2: Infrastructure Provisioning & Environment Setup
-- [x] Configure `.devcontainer/devcontainer.json` for reproducible Azure Functions and Terraform execution.
-- [ ] Outline `infra/main.tf` logic for AI Search, Capability Host, and AI Foundry connections (Entra ID).
-- [ ] Provision VNet and Private endpoints configurations in Terraform.
+## Dev Environment Modernization — Completed
+- [x] Analyze project structure, challenge `.devcontainer`
+- [x] Configure workspace interpreter → `.venv/Scripts/python.exe`
+- [x] Modify `Dockerfile` (add `PYTHONDONTWRITEBYTECODE`)
+- [x] Update `entrypoint.sh` with `--server.runOnSave`
+- [x] Create `docker-compose.dev.yml`
+- [x] Create `.env.example` and `.env`
+- [x] Remove stale `requirements.txt`
+- [x] Update `.dockerignore` and `.gitignore`
+- [x] Rewrite `README.md` (native + container workflows)
+- [x] Create `.agents/workflows/dev.md` and `docker-validate.md`
+- [x] Verify: `uv run pytest` passes (5/5 ✓)
+- [ ] Verify: Docker live-reload (requires Rancher Desktop — manual)
+
+## Phase 2: Infrastructure Provisioning
+- [ ] `infra/main.tf` — AI Search, Capability Host, AI Foundry (Entra ID)
+- [ ] VNet and Private endpoints in Terraform
 
 ## Phase 3: Containerization & Deployment
-- [x] Build `Dockerfile` utilizing UV.
-- [ ] Enforce `DefaultAzureCredential` across all python connection clients.
+- [x] Build `Dockerfile` utilizing UV
+- [ ] Enforce `DefaultAzureCredential` across all clients
 
 ## Phase 4: Continuous Evaluation
-- [ ] Wrap Foundry calls in Azure Application Insights hooks.
-- [ ] Prepare scripts to tune Semantic Chunking heuristics.
+- [ ] Application Insights hooks
+- [ ] Semantic Chunking tuning scripts
