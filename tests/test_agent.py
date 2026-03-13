@@ -1,6 +1,6 @@
 import pytest
 import azure.functions as func
-from src.AdvisorTrigger import main
+from src.ArchitectureAdvisorTrigger import main
 
 def test_my_hobby_agent_missing_data():
     # Test that the agent handles invalid input cleanly (Mockability).

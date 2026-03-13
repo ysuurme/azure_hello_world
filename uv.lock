@@ -88,6 +88,7 @@ dependencies = [
     { name = "azure-ai-inference" },
     { name = "azure-functions" },
     { name = "pydantic" },
+    { name = "requests" },
     { name = "streamlit" },
 ]
 
@@ -101,6 +102,7 @@ requires-dist = [
     { name = "azure-ai-inference", specifier = ">=1.0.0b9" },
     { name = "azure-functions", specifier = ">=1.24.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "requests", specifier = ">=2.32.0" },
     { name = "streamlit", specifier = ">=1.55.0" },
 ]
 

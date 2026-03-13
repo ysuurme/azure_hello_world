@@ -13,7 +13,7 @@
 - [x] Create `docs/architectures/local/001_mva_local_setup.md` to document the local container setup.
 - [x] Implement `src/ui/app.py` (Streamlit UI) - *Restructured*.
 - [x] Create `.devcontainer/Dockerfile` (Unified Container).
-- [ ] Run and validate the unified container.
+- [/] Run and validate the unified container (pytest 5/5 passed, Docker build pending).
 
 ## Phase 2: Infrastructure Provisioning & Environment Setup
 - [x] Configure `.devcontainer/devcontainer.json` for reproducible Azure Functions and Terraform execution.

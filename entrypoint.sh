@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Start Streamlit in the background
-# We bind to 0.0.0.0 to ensure it's accessible outside the container
-streamlit run frontend/app.py --server.port 8501 --server.address 0.0.0.0 &
+# Bind to 0.0.0.0 to ensure accessibility outside the container
+uv run streamlit run src/ui/app.py --server.port 8501 --server.address 0.0.0.0 &
 
-# Start the Azure Functions Host (Foreground Process)
-/azure-functions-host/Microsoft.Azure.WebJobs.Script.WebHost
+# Start the Azure Functions Host in the foreground
+cd src && uv run func start --port 7071

@@ -1,7 +1,11 @@
 .git
 .venv
 .vscode
+.devcontainer
 __pycache__
 .pytest_cache
 *.pyc
 .env
+infra
+tests
+architecture

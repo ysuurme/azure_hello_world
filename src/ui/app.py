@@ -11,7 +11,7 @@ st.markdown("### Technical Design Authority Agent")
 with st.sidebar:
     st.header("Configuration")
     # Unified Container Mode: Streamlit talks to Localhost Port 80 (Azure Function)
-    api_url = st.text_input("Agent Endpoint", value="http://localhost:80/api/AdvisorTrigger")
+    api_url = st.text_input("Agent Endpoint", value="http://localhost:7071/api/ArchitectureAdvisorTrigger")
     st.info("Running in Unified Container Mode.")
 
 # Main chat interface
