@@ -2,9 +2,9 @@ import streamlit as st
 import requests
 import json
 
-st.set_page_config(page_title="Azure Architecture Sentinel", layout="wide")
+st.set_page_config(page_title="Azure Architecture Agent", layout="wide")
 
-st.title("Azure Architecture Sentinel 🛡️")
+st.title("Azure Architecture Agent 🛡️")
 st.markdown("### Technical Design Authority Agent")
 
 # Sidebar for configuration
@@ -22,7 +22,7 @@ if st.button("Analyze Architecture", type="primary"):
     if not query:
         st.warning("Please enter a query.")
     else:
-        with st.spinner("Sentinel is reasoning..."):
+        with st.spinner("Agent is reasoning..."):
             try:
                 payload = {"query": query}
                 response = requests.post(api_url, json=payload, timeout=120)
