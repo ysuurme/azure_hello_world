@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import patch
-from src.utils.tools import calculate_cost
+from src.utils.m_tools import calculate_cost
 
-@patch('src.utils.tools.requests.get')
+@patch('src.utils.m_tools.requests.get')
 def test_calculate_cost_api_success(mock_get):
     """
     Standard Library First: We mock 'requests' to test API logic without billing.
@@ -24,7 +24,7 @@ def test_calculate_cost_api_success(mock_get):
     assert "Virtual Machine" in result["trade_off_matrix_data"]
     assert result["trade_off_matrix_data"]["Virtual Machine"] == 50.0
 
-@patch('src.utils.tools.requests.get')
+@patch('src.utils.m_tools.requests.get')
 def test_calculate_cost_api_fallback(mock_get):
     """
     Test the fallback static dictionary when the API fails.

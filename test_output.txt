@@ -1,0 +1,31 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.10.11, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\Yanni\Github\Projects\azure_hello_world\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Yanni\Github\Projects\azure_hello_world
+configfile: pyproject.toml
+collecting ... collected 1 item / 2 errors
+
+=================================== ERRORS ====================================
+__________________ ERROR collecting tests/test_ingestion.py ___________________
+ImportError while importing test module 'C:\Users\Yanni\Github\Projects\azure_hello_world\tests\test_ingestion.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Roaming\uv\python\cpython-3.10.11-windows-x86_64-none\lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests\test_ingestion.py:2: in <module>
+    from src.utils.ingestion import IngestionPipeline
+E   ModuleNotFoundError: No module named 'src.utils.ingestion'
+____________________ ERROR collecting tests/test_tools.py _____________________
+ImportError while importing test module 'C:\Users\Yanni\Github\Projects\azure_hello_world\tests\test_tools.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Roaming\uv\python\cpython-3.10.11-windows-x86_64-none\lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests\test_tools.py:3: in <module>
+    from src.utils.tools import calculate_cost
+E   ModuleNotFoundError: No module named 'src.utils.tools'
+=========================== short test summary info ===========================
+ERROR tests/test_ingestion.py
+ERROR tests/test_tools.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!
+============================== 2 errors in 0.65s ==============================
