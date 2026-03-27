@@ -1,6 +1,6 @@
 import streamlit as st
 import json
-from src.utils.api_adapter import fetch_architecture_insight
+from src.utils.m_api_adapter import fetch_architecture_insight
 from src.utils.m_log import f_log, setup_logging
 
 # Initialize standardized telemetry
@@ -15,7 +15,7 @@ st.markdown("### Technical Design Authority Agent")
 with st.sidebar:
     st.header("Configuration")
     # Unified Container Mode: Streamlit talks to Localhost Port 80 (Azure Function)
-    api_url = st.text_input("Agent Endpoint", value="http://localhost:7071/api/ArchitectureAdvisorTrigger")
+    api_url = st.text_input("Agent Endpoint", value="http://localhost:7071/api/agent_trigger")
     st.info("Running in Unified Container Mode.")
 
 # Main chat interface

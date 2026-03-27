@@ -54,4 +54,4 @@ docker compose -f docker-compose.dev.yml up --build
 ```
 
 - **Streamlit UI**: http://localhost:8501
-- **Azure Functions**: http://localhost:7071/api/ArchitectureAdvisorTrigger
+- **Azure Functions**: http://localhost:7071/api/agent_trigger
