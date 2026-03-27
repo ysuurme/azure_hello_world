@@ -17,7 +17,6 @@ local.settings.json
 .vs/
 .vscode/
 .idea/
-.agents/
 *.code-workspace
 
 # OS
