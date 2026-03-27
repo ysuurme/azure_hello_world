@@ -20,6 +20,7 @@ This repository enforces strict engineering standards through a custom **Agentic
 
 ### Prerequisites
 - **Python 3.10+** installed on your Windows host
+- **Azure Functions Core Tools v4+** (if running natively: `npm i -g azure-functions-core-tools@4`)
 - **UV** package manager (`pip install uv` or [standalone installer](https://docs.astral.sh/uv/getting-started/installation/))
 - **Docker / Rancher Desktop** (optional, for container validation) 
 
@@ -34,8 +35,8 @@ uv sync --frozen
 # 2. Start the Streamlit UI (port 8501)
 uv run streamlit run src/ui/app.py --server.port 8501
 
-# 3. In a second terminal — start the Azure Functions host (port 7071)
-cd src; $env:PYTHONPATH=".."; uv run func start --port 7071
+# 3. In a second terminal (from the project root) — start the Azure Functions host (port 7071)
+cd src; $env:PYTHONPATH=".."; uv run func.cmd start --port 7071
 
 # 4. Run tests
 uv run pytest tests/ -v

@@ -1,3 +1,8 @@
+import sys
+import os
+# Ensure the project root is always in path to resolve 'src.' module imports natively
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
 import streamlit as st
 import json
 from src.utils.m_api_adapter import fetch_architecture_insight
@@ -8,7 +13,7 @@ setup_logging()
 
 st.set_page_config(page_title="Azure Architecture Agent", layout="wide")
 
-st.title("Azure Architecture Agent 🛡️")
+st.title("Architecture Agent 🛡️")
 st.markdown("### Technical Design Authority Agent")
 
 # Sidebar for configuration
