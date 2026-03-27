@@ -1,6 +1,6 @@
-# Sentinel Technical Reference (agents.md)
+# Azure Architecture Agent Technical Reference (agents.md)
 
-This file serves as a reference log capturing the extensive architectural context, personal learning goals, and design philosophy discussed during the creation of the Azure Architecture Sentinel. It ensures future Agent sessions understand the complex rationale behind the codebase.
+This file serves as a reference log capturing the extensive architectural context, personal learning goals, and design philosophy discussed during the creation of the Azure Architecture Agent. It ensures future Agent sessions understand the complex rationale behind the codebase.
 
 ## Future Session Operating Instructions
 1. **Always read the `README.md`** for context when starting a new session.

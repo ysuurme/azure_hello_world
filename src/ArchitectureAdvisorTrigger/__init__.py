@@ -1,6 +1,6 @@
 import json
-import logging
 import azure.functions as func
+from src.utils.m_log import f_log
 
 from src.agents.arch_advisor import ArchitectureAdvisorAgent
 
@@ -10,7 +10,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     Standard Library First: Use standard dict manipulation.
     Delegates work to agents for Single Responsibility.
     """
-    logging.info('Architecture Sentinel processing a request.')
+    f_log('Architecture Sentinel processing a request.', c_type="start")
 
     try:
         req_body = req.get_json()
@@ -32,7 +32,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         agent = ArchitectureAdvisorAgent()
         agent_response = agent.process_query(query)
     except Exception as e:
-        logging.error(f"Agent error: {e}")
+        f_log(f"Agent error: {e}", c_type="error")
         return func.HttpResponse(
              f"Error generating insight: {str(e)}",
              status_code=500

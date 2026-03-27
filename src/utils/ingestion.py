@@ -1,5 +1,5 @@
 import hashlib
-import logging
+from src.utils.m_log import f_log
 from typing import Dict, Any, List
 
 class IngestionPipeline:
@@ -36,13 +36,13 @@ class IngestionPipeline:
         """
         Mocks calling Azure Document Intelligence (Layout Model).
         """
-        logging.info(f"Extracting layout and tables from {file_path}")
+        f_log(f"Extracting layout and tables from {file_path}", c_type="process")
         return "# Extracted Header\nThis is structured markdown representing a complex WAF architecture table."
 
     def ingest_local_markdown(self, docs_directory: str) -> None:
         """
         Main loop for Phase 1: local ingestion.
         """
-        logging.info(f"Starting ingestion run from {docs_directory}")
+        f_log(f"Starting ingestion run from {docs_directory}", c_type="process")
         # In reality, this would os.walk the directory, load files, chunk them, and use self.search_client.upload_documents
         pass

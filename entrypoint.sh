@@ -8,4 +8,4 @@ uv run streamlit run src/ui/app.py \
   --server.runOnSave true &
 
 # Start the Azure Functions Host in the foreground
-cd src && uv run func start --port 7071
+cd src && exec uv run func start --port 7071

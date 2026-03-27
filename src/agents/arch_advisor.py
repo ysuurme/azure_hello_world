@@ -1,4 +1,4 @@
-import logging
+from src.utils.m_log import f_log
 from typing import Dict, Any
 
 from src.utils.agent_factory import get_foundry_agent_client
@@ -29,12 +29,12 @@ class ArchitectureAdvisorAgent:
         """
         Executes the reasoning loop.
         """
-        logging.info(f"Agent processing query: {query}")
+        f_log(f"Agent processing query: {query}", c_type="reasoning")
         
         # In a fully deployed Phase 1, the client would orchestrate the thread.
         # For this execution step, we return the structured scaffold response.
         if not self.client:
-           logging.warning("No live Foundry Client found. Executing Local Mock Path.")
+           f_log("No live Foundry Client found. Executing Local Mock Path.", c_type="warning")
            
         # Example Tool Execution (Standard Library First)
         cost_assessment = calculate_cost(["Front Door", "Multi-Region App Service"])
