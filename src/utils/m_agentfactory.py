@@ -1,9 +1,14 @@
 import os
-from src.utils.m_log import f_log
-from typing import Optional
+from dotenv import load_dotenv
+load_dotenv()
 
+from src.utils.m_log import f_log
 from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
+from typing import Optional
+
+# Module‑level cache for the AI Foundry client to avoid re‑initialisation and duplicate logs
+_cached_client: Optional[AIProjectClient] = None
 
 def get_foundry_agent_client() -> Optional[AIProjectClient]:
     """
@@ -13,9 +18,14 @@ def get_foundry_agent_client() -> Optional[AIProjectClient]:
     endpoint = os.environ.get("AIPROJECT_CONNECTION_STRING") or os.environ.get("AIFOUNDRY_CONNECTION_STRING")
     
     if not endpoint:
-        f_log("AIPROJECT_CONNECTION_STRING not found in .env.", c_type="warning")
+        f_log("AIFOUNDRY_CONNECTION_STRING not found in .env.", c_type="warning")
         return None
         
+    # Return cached client if already initialized to avoid duplicate logs
+    global _cached_client
+    if _cached_client is not None:
+        return _cached_client
+
     f_log("Initializing DefaultAzureCredential for AI Foundry.", c_type="process")
     try:
         credential = DefaultAzureCredential()
@@ -35,6 +45,7 @@ def get_foundry_agent_client() -> Optional[AIProjectClient]:
             )
             
         f_log("Foundry client connected successfully.", c_type="success")
+        _cached_client = client
         return client
     except Exception as e:
         f_log(f"Failed to authenticate with Azure AI Foundry: {str(e)}", c_type="error")

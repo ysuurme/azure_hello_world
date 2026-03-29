@@ -47,14 +47,15 @@ class IntakeReviewerAgent:
         # MVP LLM Integration via Inference Client 
         try:
             f_log("Calling AI Foundry Inference...", c_type="process")
-            response = self.client.inference.get_chat_completions(
-                # Pull dynamically from active environmental singleton config
-                model=AGENT_MODELS["intake_reviewer"], 
-                messages=[
-                    SystemMessage(content=self.system_prompt),
-                    UserMessage(content=user_prompt)
-                ]
-            )
+            # Obtain a chat completions client from the AIProjectClient
+            with self.client.inference.get_chat_completions_client() as chat_client:
+                response = chat_client.complete(
+                    model=AGENT_MODELS["intake_reviewer"],
+                    messages=[
+                        SystemMessage(content=self.system_prompt),
+                        UserMessage(content=user_prompt)
+                    ]
+                )
             raw_output = response.choices[0].message.content
             # To handle markdown json wrappers securely:
             clean_json = raw_output.replace("```json", "").replace("```", "").strip()

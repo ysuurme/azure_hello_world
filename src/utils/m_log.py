@@ -192,6 +192,17 @@ def _ensure_setup() -> None:
 # PUBLIC API
 ###############################################################################
 
+def log_new_request(request_title: str) -> None:
+    """Log the start of a new user request with clear separators and timestamp.
+
+    Parameters
+    ----------
+    request_title: str
+        Human‑readable title describing the request (e.g. "User initiated Analysis from Streamlit").
+    """
+    # Use the 'start' stage emoji and separator lines for visibility
+    f_log(request_title, c_type="start", c_before="=", c_after="=")
+
 def f_log(
     c_message: str,
     c_type:    str  = "info",
