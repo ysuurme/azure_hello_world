@@ -5,7 +5,7 @@ from src.agents.architecture_composer import ArchitectureComposerAgent
 class TestArchitectureComposerAgent:
 
     @patch('src.agents.architecture_composer.calculate_cost')
-    @patch('src.agents.architecture_composer.get_foundry_agent_client')
+    @patch('src.utils.m_ai_client.ClientManager.get_aiproject_client')
     def test_local_composer_generation(self, mock_client, mock_cost):
         """
         Tests the local generation path by bypassing actual LLM connection.
@@ -25,7 +25,7 @@ class TestArchitectureComposerAgent:
         assert "b. Decisions" in result_markdown
         
     @patch('src.agents.architecture_composer.calculate_cost')
-    @patch('src.agents.architecture_composer.get_foundry_agent_client')
+    @patch('src.utils.m_ai_client.ClientManager.get_aiproject_client')
     def test_live_llm_inference_call(self, mock_client, mock_cost):
         """
         Simulates the Azure AI inference payload to ensure structurally correct parsing.

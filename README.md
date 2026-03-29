@@ -59,7 +59,10 @@ uv run streamlit run src/ui/app.py
 ```
 *(Access the UI immediately via `http://localhost:8501`)*
 
----
+## Code Validation
+```powershell
+python -m pytest -v tests
+```
 
 ## 🐳 Container Validation (Production Parity)
 Our Container respects strictly hardened Rootless Multi-Stage paradigms. 

@@ -4,7 +4,7 @@ from unittest import mock
 
 import pytest
 
-from src.utils.m_agentfactory import get_foundry_agent_client
+from src.utils.m_ai_client import ClientManager
 from src.agents.architecture_composer import ArchitectureComposerAgent
 from src.agents.intake_reviewer import IntakeReviewerAgent
 
@@ -28,26 +28,25 @@ class MockAIProjectClient:
 
 def test_get_foundry_client_with_raw_endpoint(monkeypatch):
     """Validate that a raw endpoint string is parsed correctly and a client is created."""
-    monkeypatch.setenv("AIFOUNDRY_CONNECTION_STRING", "endpoint=https://example.com")
+    monkeypatch.setenv("AZURE_AAIF_PROJECT_ENDPOINT", "endpoint=https://example.com")
     # Patch the Azure SDK classes to avoid real network calls
     monkeypatch.setattr("azure.ai.projects.AIProjectClient", MockAIProjectClient)
     monkeypatch.setattr("azure.identity.DefaultAzureCredential", lambda: None)
 
-    client = get_foundry_agent_client()
+    client = ClientManager().get_aiproject_client()
     assert isinstance(client, MockAIProjectClient)
 
 
 def test_get_foundry_client_missing(monkeypatch):
     """When no connection string is present the factory should return None."""
-    monkeypatch.delenv("AIFOUNDRY_CONNECTION_STRING", raising=False)
-    monkeypatch.delenv("AIPROJECT_CONNECTION_STRING", raising=False)
-    client = get_foundry_agent_client()
+    monkeypatch.delenv("AZURE_AAIF_PROJECT_ENDPOINT", raising=False)
+    client = ClientManager().get_aiproject_client()
     assert client is None
 
 
 def test_architecture_composer_fallback(monkeypatch):
     """When no client is available the composer should return mocked markdown."""
-    monkeypatch.setattr("src.utils.m_agentfactory.get_foundry_agent_client", lambda: None)
+    monkeypatch.setattr("src.utils.m_ai_client.ClientManager.get_aiproject_client", lambda self: None)
     agent = ArchitectureComposerAgent()
     req = {"objective": "Demo app"}
     result = agent.generate_architecture(req)
@@ -57,7 +56,7 @@ def test_architecture_composer_fallback(monkeypatch):
 
 def test_intake_reviewer_fallback(monkeypatch):
     """When no client is available the intake reviewer should return a mocked dict."""
-    monkeypatch.setattr("src.utils.m_agentfactory.get_foundry_agent_client", lambda: None)
+    monkeypatch.setattr("src.utils.m_ai_client.ClientManager.get_aiproject_client", lambda self: None)
     reviewer = IntakeReviewerAgent()
     short_prompt = "short"
     result = reviewer.review_input(short_prompt)

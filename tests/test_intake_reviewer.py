@@ -4,7 +4,7 @@ from src.agents.intake_reviewer import IntakeReviewerAgent
 
 class TestIntakeReviewerAgent:
     
-    @patch('src.agents.intake_reviewer.get_foundry_agent_client')
+    @patch('src.utils.m_ai_client.ClientManager.get_aiproject_client')
     def test_mocked_insufficient_prompt(self, mock_client):
         """
         Verify that a prompt with fewer than 5 words natively triggers the clarification status.
@@ -18,7 +18,7 @@ class TestIntakeReviewerAgent:
         assert response.get("status") == "needs_clarification"
         assert "questions" in response
 
-    @patch('src.agents.intake_reviewer.get_foundry_agent_client')
+    @patch('src.utils.m_ai_client.ClientManager.get_aiproject_client')
     def test_mocked_sufficient_prompt(self, mock_client):
         """
         Verify that a long, descriptive prompt natively triggers a ready state constraint dict.
