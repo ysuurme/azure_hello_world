@@ -5,7 +5,7 @@ import src.utils.m_ai_client as m_ai_client
 from typing import Dict, Any, List
 from src.config import AGENT_MODELS
 
-from azure.ai.inference.models import SystemMessage, UserMessage
+# Use Foundry/OpenAI-style responses client via AIProjectClient.get_openai_client()
 from src.utils.m_tools import calculate_cost
 
 class ArchitectureComposerAgent:
@@ -60,16 +60,17 @@ class ArchitectureComposerAgent:
         user_query += f"Checker Constraint Evaluation (Azure Retail Price Live Sync):\n{json.dumps(cost_evaluation, indent=2)}\n\n"
         user_query += "INSTRUCTION: You must critique the Maker Output against the Checker Costs. If the Monthly Cost exceeds the User Constraint budget, you MUST select an alternative 'Value' technology inside your rationale and adjust the architecture diagram output accordingly. Draft the markdown strictly according to the format."
         
+        # Call AI Foundry Responses via OpenAI surface exclusively.
         try:
-            f_log("Calling AI Foundry Inference...", c_type="process")
-            # Use the modern chat completions client returned by ClientManager
-            chat = self.client_manager.get_chat_completions_client()
-            response = chat.complete(
-                model=AGENT_MODELS["architecture_composer"],
-                messages=[SystemMessage(content=self.system_prompt), UserMessage(content=user_query)]
-            )
+            f_log("Calling AI Foundry Responses via OpenAI surface...", c_type="process")
+            with self.client_manager.get_openai_client() as openai_client:
+                combined_input = f"{self.system_prompt}\n\n{user_query}"
+                response = openai_client.responses.create(
+                    model=AGENT_MODELS["architecture_composer"],
+                    input=combined_input,
+                )
 
-            return response.choices[0].message.content
+            return getattr(response, "output_text", None) or getattr(response, "text", None) or str(response)
         except Exception as e:
             f_log(f"LLM Generation Failed: {e}", c_type="error")
             return f"Error Generating Architecture: {e}"

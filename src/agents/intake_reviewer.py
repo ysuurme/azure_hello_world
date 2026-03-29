@@ -5,7 +5,7 @@ import src.utils.m_ai_client as m_ai_client
 from src.config import AGENT_MODELS, TEMPLATE_PATH
 from typing import Dict, Any
 
-from azure.ai.inference.models import SystemMessage, UserMessage
+# Use Foundry/OpenAI-style responses client via AIProjectClient.get_openai_client()
 
 class IntakeReviewerAgent:
     """
@@ -41,19 +41,21 @@ class IntakeReviewerAgent:
         """
         f_log(f"IntakeReviewer reviewing prompt: {user_prompt[:50]}...", c_type="process")
 
+        # Call AI Foundry Responses via OpenAI surface exclusively.
         try:
-            f_log("Calling AI Foundry Inference...", c_type="process")
-            chat = self.client_manager.get_chat_completions_client()
-            response = chat.complete(
-                model=AGENT_MODELS["intake_reviewer"],
-                messages=[SystemMessage(content=self.system_prompt), UserMessage(content=user_prompt)]
-            )
+            f_log("Calling AI Foundry Responses via OpenAI surface...", c_type="process")
+            with self.client_manager.get_openai_client() as openai_client:
+                # Combine system prompt + user input into a single input for Responses
+                combined_input = f"{self.system_prompt}\n\n{user_prompt}"
+                response = openai_client.responses.create(
+                    model=AGENT_MODELS["intake_reviewer"],
+                    input=combined_input,
+                )
 
-            raw_output = response.choices[0].message.content
+            raw_output = getattr(response, "output_text", None) or getattr(response, "text", None) or str(response)
             # To handle markdown json wrappers securely:
             clean_json = raw_output.replace("```json", "").replace("```", "").strip()
             return json.loads(clean_json)
-
         except Exception as e:
             f_log(f"Azure Inference Failure: {str(e)}", c_type="error")
             return {"status": "needs_clarification", "questions": [f"I encountered a service fault analyzing your request: {e}"]}

@@ -6,8 +6,8 @@ from src.utils.m_ai_client import ClientManager
 class TestArchitectureComposerAgent:
 
     @patch('src.agents.architecture_composer.calculate_cost')
-    @patch('src.utils.m_ai_client.ClientManager.get_chat_completions_client')
-    def test_local_composer_generation(self, mock_chat_client, mock_cost):
+    @patch('src.utils.m_ai_client.ClientManager.get_openai_client')
+    def test_local_composer_generation(self, mock_openai_cm, mock_cost):
         """
         Tests the local generation path by bypassing actual LLM connection.
         Verifies that mathematical tools and format drafts still run.
@@ -26,7 +26,22 @@ class TestArchitectureComposerAgent:
                     choices = [Choice()]
                 return Resp()
 
-        mock_chat_client.return_value = MockChat()
+        # Build a context manager mock that returns an object with responses.create
+        class CM:
+            def __enter__(self):
+                class O:
+                    def __init__(self):
+                        class Responses:
+                            def create(self, model, input):
+                                class Resp:
+                                    output_text = "# Proposed Solution Architecture\n\n## a. Purpose\nTo fulfill the business objective: Enterprise B2B API\n\n## b. Decisions"
+                                return Resp()
+                        self.responses = Responses()
+                return O()
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        mock_openai_cm.return_value = CM()
 
         agent = ArchitectureComposerAgent(client_manager=ClientManager())
 
@@ -38,8 +53,8 @@ class TestArchitectureComposerAgent:
         assert "b. Decisions" in result_markdown
         
     @patch('src.agents.architecture_composer.calculate_cost')
-    @patch('src.utils.m_ai_client.ClientManager.get_chat_completions_client')
-    def test_live_llm_inference_call(self, mock_chat_client, mock_cost):
+    @patch('src.utils.m_ai_client.ClientManager.get_openai_client')
+    def test_live_llm_inference_call(self, mock_openai_cm, mock_cost):
         """
         Simulates the Azure AI inference payload to ensure structurally correct parsing.
         """
@@ -50,15 +65,25 @@ class TestArchitectureComposerAgent:
         mock_choice = MagicMock()
         mock_choice.message.content = "## Architecture Output Generated"
         mock_response.choices = [mock_choice]
+        # Ensure responses.create path returns output_text for the new OpenAI surface
+        mock_response.output_text = mock_choice.message.content
         
-        # Make a mock chat client whose complete() returns the mock_response
-        mock_chat = MagicMock()
-        mock_chat.complete.return_value = mock_response
+        # Create a context manager yielding an object with responses.create() returning mock_response-like output
+        class CM2:
+            def __enter__(self):
+                class O:
+                    def __init__(self):
+                        class Responses:
+                            def create(self, model, input):
+                                return mock_response
+                        self.responses = Responses()
+                return O()
+            def __exit__(self, exc_type, exc, tb):
+                return False
 
-        mock_chat_client.return_value = mock_chat
+        mock_openai_cm.return_value = CM2()
 
         agent = ArchitectureComposerAgent(client_manager=ClientManager())
         result = agent.generate_architecture({"objective": "Test"})
 
         assert result == "## Architecture Output Generated"
-        mock_chat.complete.assert_called_once()

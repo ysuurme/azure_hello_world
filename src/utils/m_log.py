@@ -24,6 +24,7 @@ import time
 from functools import wraps
 from pathlib import Path
 from src.config import LOG_PROFILE, LOG_SEPARATOR_WIDTH, LOG_LINE_WIDTH, DIR_LOG
+import src.config as config
 
 ###############################################################################
 # CONFIGURATION CONSTANTS (Self-Contained)
@@ -178,6 +179,11 @@ def setup_logging(profile: str = None) -> None:
     # --- Suppress noisy third-party loggers ---
     for noisy_logger in ("azure", "urllib3", "httpx"):
         logging.getLogger(noisy_logger).setLevel(logging.WARNING)
+
+    # Startup informational log for TEST profile: indicate chosen Azure auth mode
+    if active_profile == "TEST":
+        auth_mode = "service_principal" if getattr(config, "USE_AZURE_SERVICE_PRINCIPAL", False) else "cli"
+        _logger.info(f"Startup: Azure auth mode selected: {auth_mode} (AZURE_AUTH_MODE={getattr(config, 'AZURE_AUTH_MODE', 'cli')})")
 
     _is_configured = True
 

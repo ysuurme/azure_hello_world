@@ -5,6 +5,7 @@ load_dotenv()
 from typing import Optional, Any
 
 from src.utils.m_log import f_log
+import src.config as config
 
 import azure.ai.projects as projects
 from azure.core.exceptions import ClientAuthenticationError
@@ -28,6 +29,21 @@ class AuthManager:
         Raises ClientAuthenticationError when credentials cannot be created.
         """
         try:
+            # If the app is configured to *explicitly* use a service principal,
+            # require the SP env vars to be present and non-empty. Otherwise,
+            # remove empty SP placeholders so DefaultAzureCredential can fall
+            # back to other credential types (e.g., Azure CLI `az login`).
+            if config.USE_AZURE_SERVICE_PRINCIPAL:
+                missing = [v for v in ("AZURE_CLIENT_ID", "AZURE_TENANT_ID", "AZURE_CLIENT_SECRET") if not os.getenv(v)]
+                if missing:
+                    raise RuntimeError(f"AZURE_AUTH_MODE is set to service principal but missing env vars: {', '.join(missing)}")
+            else:
+                for _v in ("AZURE_CLIENT_ID", "AZURE_TENANT_ID", "AZURE_CLIENT_SECRET"):
+                    _val = os.getenv(_v)
+                    if _val is not None and _val.strip() == "":
+                        os.environ.pop(_v, None)
+                        f_log(f"Removed empty env var {_v} to allow DefaultAzureCredential fallback.", c_type="debug")
+
             # Import here to allow tests to monkeypatch azure.identity.DefaultAzureCredential
             from azure.identity import DefaultAzureCredential
 
@@ -47,8 +63,8 @@ class ClientManager:
 
     This implementation standardizes on `AIProjectClient` from Azure AI Foundry.
     Agents must be passed a single shared `ClientManager` instance at application
-    bootstrap and should rely on `get_chat_completions_client()` which strictly
-    uses the `AIProjectClient.inference.get_chat_completions_client()` surface.
+    bootstrap and should rely on `get_openai_client()` which yields the
+    OpenAI-style client from `AIProjectClient.get_openai_client()`.
     """
 
     def __init__(self, auth: Optional[AuthManager] = None) -> None:
@@ -86,23 +102,23 @@ class ClientManager:
             f_log(f"Failed to initialize AIProjectClient: {e}", c_type="error")
             raise
 
-    def get_chat_completions_client(self):
-        """Return the chat completions client from the AIProjectClient.
+    # Legacy chat completions client removed. Use `get_openai_client()` instead.
 
-        This strictly requires the `inference.get_chat_completions_client` surface
-        on `AIProjectClient`. If unavailable, a RuntimeError is raised — no
-        alternate SDKs or fallbacks are permitted by this codebase.
+    def get_openai_client(self):
+        """Return an OpenAI-style client from the AIProjectClient.
+
+        This yields the client returned by `AIProjectClient.get_openai_client()` and
+        should be used as a context manager:
+
+            with client_manager.get_openai_client() as openai_client:
+                resp = openai_client.responses.create(...)
+
+        Raises RuntimeError if the AIProjectClient does not expose `get_openai_client`.
         """
         aiproject = self.get_aiproject_client()
-
-        inference = getattr(aiproject, "inference", None)
-        if inference is None:
-            raise RuntimeError("AIProjectClient has no 'inference' surface — ensure SDK version supports inference APIs")
-
-        get_client = getattr(inference, "get_chat_completions_client", None)
+        get_client = getattr(aiproject, "get_openai_client", None)
         if not callable(get_client):
-            raise RuntimeError("Inference surface does not expose 'get_chat_completions_client' — SDK mismatch")
-
+            raise RuntimeError("AIProjectClient does not expose 'get_openai_client' — update SDK or use a different surface")
         return get_client()
 
 

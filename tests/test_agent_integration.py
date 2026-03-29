@@ -58,7 +58,22 @@ def test_architecture_composer_fallback(monkeypatch):
                 choices = [Choice()]
             return Resp()
 
-    monkeypatch.setattr("src.utils.m_ai_client.ClientManager.get_chat_completions_client", lambda self: MockChat())
+    # Patch the ClientManager to return a context manager exposing `responses.create`
+    class MockOpenAI:
+        def __enter__(self):
+            class C:
+                def __init__(self):
+                    class Responses:
+                        def create(self, model, input):
+                            class Resp:
+                                output_text = "# Proposed Solution Architecture\n\n## a. Purpose\nMocked"
+                            return Resp()
+                    self.responses = Responses()
+            return C()
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr("src.utils.m_ai_client.ClientManager.get_openai_client", lambda self: MockOpenAI())
     agent = ArchitectureComposerAgent(client_manager=ClientManager())
     req = {"objective": "Demo app"}
     result = agent.generate_architecture(req)
@@ -89,14 +104,14 @@ def test_intake_reviewer_fallback(monkeypatch):
     long_json = '{"status": "ready", "requirements": {"objective": "Demo"}}'
 
     # First test short prompt
-    monkeypatch.setattr("src.utils.m_ai_client.ClientManager.get_chat_completions_client", lambda self: make_chat_with(short_json))
+    monkeypatch.setattr("src.utils.m_ai_client.ClientManager.get_openai_client", lambda self: type("CM", (), {"__enter__": lambda s: type("O", (), {"responses": type("R", (), {"create": lambda self, model, input: type("Resp", (), {"output_text": short_json})()})()}), "__exit__": lambda s, a, b, c: False})())
     reviewer = IntakeReviewerAgent(client_manager=ClientManager())
     short_prompt = "short"
     result = reviewer.review_input(short_prompt)
     assert result["status"] == "needs_clarification"
 
     # Then test long prompt
-    monkeypatch.setattr("src.utils.m_ai_client.ClientManager.get_chat_completions_client", lambda self: make_chat_with(long_json))
+    monkeypatch.setattr("src.utils.m_ai_client.ClientManager.get_openai_client", lambda self: type("CM", (), {"__enter__": lambda s: type("O", (), {"responses": type("R", (), {"create": lambda self, model, input: type("Resp", (), {"output_text": long_json})()})()}), "__exit__": lambda s, a, b, c: False})())
     reviewer = IntakeReviewerAgent(client_manager=ClientManager())
     long_prompt = "This is a sufficiently long prompt describing the workload and constraints"
     result = reviewer.review_input(long_prompt)
