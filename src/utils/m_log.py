@@ -23,15 +23,13 @@ import textwrap
 import time
 from functools import wraps
 from pathlib import Path
+from src.config import LOG_PROFILE, LOG_SEPARATOR_WIDTH, LOG_LINE_WIDTH, DIR_LOG
 
 ###############################################################################
 # CONFIGURATION CONSTANTS (Self-Contained)
 ###############################################################################
 
-LOG_PROFILE = os.getenv("LOG_PROFILE", "PRD")
-LOG_SEPARATOR_WIDTH = int(os.getenv("LOG_SEPARATOR_WIDTH", "80"))
-LOG_LINE_WIDTH = int(os.getenv("LOG_LINE_WIDTH", "120"))
-DIR_LOG = Path(os.getenv("DIR_LOG", "logs"))
+# Configurations now actively sourced globally from config.py
 
 ###############################################################################
 # CONSTANTS

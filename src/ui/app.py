@@ -1,58 +1,92 @@
 import sys
 import os
+import base64
+
 # Ensure the project root is always in path to resolve 'src.' module imports natively
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 import streamlit as st
-import json
-from src.utils.m_api_adapter import fetch_architecture_insight
+from src.utils.m_orchestrator import AgenticOrchestrator
+from src.utils.m_diagram_engine import DiagramEngine
+from src.utils.m_persist_design import ArchitecturePersister
 from src.utils.m_log import f_log, setup_logging
 
-# Initialize standardized telemetry
 setup_logging()
-
 st.set_page_config(page_title="Azure Architecture Agent", layout="wide")
-
 st.title("Architecture Agent 🛡️")
 st.markdown("### Technical Design Authority Agent")
 
-# Sidebar for configuration
+# Session state initialization
+if "maf_state" not in st.session_state:
+    st.session_state.maf_state = {}
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = [{"role": "assistant", "type": "text", "content": "Welcome. Please describe the architecture you want to build."}]
+    
 with st.sidebar:
     st.header("Configuration")
-    # Unified Container Mode: Streamlit talks to Localhost Port 80 (Azure Function)
-    api_url = st.text_input("Agent Endpoint", value="http://localhost:7071/api/agent_trigger")
-    st.info("Running in Unified Container Mode.")
+    st.info("Running Lean MVP locally with direct orchestrator bindings.")
+    if st.button("Reset Session"):
+        st.session_state.maf_state = {}
+        st.session_state.chat_history = [{"role": "assistant", "type": "text", "content": "Welcome. Please describe the architecture you want to build."}]
+        st.rerun()
 
-# Main chat interface
-query = st.text_area("Describe your architecture or ask a question:", height=150, 
-                     value="Evaluating the cost impact of moving to a multi-region App Service with Azure Front Door.")
+# Display chat history Context
+for idx, msg in enumerate(st.session_state.chat_history):
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+        if msg["type"] == "architecture" and msg.get("svg"):
+            st.image(base64.b64decode(msg["svg"]))
 
-def handle_query(query: str, api_url: str) -> None:
-    """Executes the analysis flow using early guard clauses to minimize indentation limits."""
-    if not query:
-        st.warning("Please enter a query.")
-        return
+# Main chat interface for iteration
+query = st.chat_input("Describe your architecture or answer the clarifying questions...")
 
+if query:
+    st.session_state.chat_history.append({"role": "user", "type": "text", "content": query})
+    with st.chat_message("user"):
+         st.markdown(query)
+         
     with st.spinner("Agent is reasoning..."):
         try:
             f_log("User initiated Analysis from Streamlit.", c_type="start")
-            data = fetch_architecture_insight(query, api_url)
             
-            st.subheader("Recommendation")
-            st.write(data.get("recommendation", "No recommendation provided."))
+            # Use Orchestrator Natively
+            orchestrator = AgenticOrchestrator()
+            updated_state, output_text = orchestrator.orchestrate_cycle(query, st.session_state.maf_state)
             
-            insight = data.get("insight", {})
-            if "cost_evaluation" in insight:
-                st.subheader("💰 Cost Trade-off Matrix")
-                st.json(insight["cost_evaluation"])
-            
-            with st.expander("Raw Response Debug"):
-                st.json(data)
+            svg_b64 = None
+            if updated_state.get("phase") == "GENERATION":
+                f_log("Architecture Finalized. Triggering Pipelines.", c_type="process")
+                visualizer = DiagramEngine()
                 
+                # Mock MVP generation logic 
+                sample_d2 = "direction: right\nUI -> Orchestrator -> AI Search\nAI Search -> Capability Repo"
+                svg_bytes = visualizer.generate_svg(sample_d2)
+                
+                if svg_bytes:
+                    svg_b64 = base64.b64encode(svg_bytes).decode('utf-8')
+                    
+                persister = ArchitecturePersister()
+                persister.archive_solution("Lean-MVP-Design", output_text, svg_bytes)
+            
+            # Update local State Machine tracking parameters
+            st.session_state.maf_state = updated_state
+            
+            # Formulate the AI's response format
+            msg_type = "architecture" if updated_state.get("phase") == "GENERATION" else "text"
+            
+            ai_msg = {
+                 "role": "assistant",
+                 "type": msg_type,
+                 "content": output_text,
+                 "svg": svg_b64
+            }
+            st.session_state.chat_history.append(ai_msg)
+            
+            with st.chat_message("assistant"):
+                 st.markdown(output_text)
+                 if svg_b64:
+                     st.image(base64.b64decode(svg_b64))
+                     
         except Exception as e:
-            f_log(f"Connection Error: {e}", c_type="error")
-            st.error(f"Connection Error: {e}")
-            st.caption("Hint: Ensure the Azure Function host is running.")
-
-if st.button("Analyze Architecture", type="primary"):
-    handle_query(query, api_url)
+            f_log(f"Execution Error: {e}", c_type="error")
+            st.error(f"Execution Error: {e}")
