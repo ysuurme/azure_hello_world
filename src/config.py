@@ -16,7 +16,7 @@ AGENT_MODELS = {
 }
 
 # --- Architecture RAG & Design ---
-TEMPLATE_PATH = PROJECT_ROOT / "architecture" / "architecture_template.md"
+TEMPLATE_PATH = PROJECT_ROOT / "architecture" / "000_architecture_template.md"
 DESIGNS_ARCHIVE_DIR = PROJECT_ROOT / "designs" / "approved"
 
 # --- Executable Engines ---
