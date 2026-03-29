@@ -59,6 +59,20 @@ uv run streamlit run src/ui/app.py
 ```
 *(Access the UI immediately via `http://localhost:8501`)*
 
+### Bootstrap: single shared ClientManager
+
+Create one `ClientManager` at application startup and pass it to the `AgenticOrchestrator` so every agent shares the same authenticated clients and credentials lifecycle:
+
+```python
+from src.utils.m_ai_client import ClientManager
+from src.utils.m_orchestrator import AgenticOrchestrator
+
+cm = ClientManager()  # uses DefaultAzureCredential (az login or service principal env vars)
+orchestrator = AgenticOrchestrator(client_manager=cm)
+```
+
+Set `AZURE_AAIF_PROJECT_ENDPOINT` and optionally `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_SECRET` in your `.env` or environment before running.
+
 ## Code Validation
 ```powershell
 python -m pytest -v tests

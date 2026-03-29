@@ -7,6 +7,7 @@ import pytest
 from src.utils.m_ai_client import ClientManager
 from src.agents.architecture_composer import ArchitectureComposerAgent
 from src.agents.intake_reviewer import IntakeReviewerAgent
+from src.utils.m_ai_client import ClientManager
 
 # Helper mock for AIProjectClient
 class MockAIProjectClient:
@@ -40,14 +41,25 @@ def test_get_foundry_client_with_raw_endpoint(monkeypatch):
 def test_get_foundry_client_missing(monkeypatch):
     """When no connection string is present the factory should return None."""
     monkeypatch.delenv("AZURE_AAIF_PROJECT_ENDPOINT", raising=False)
-    client = ClientManager().get_aiproject_client()
-    assert client is None
+    with pytest.raises(RuntimeError):
+        ClientManager().get_aiproject_client()
 
 
 def test_architecture_composer_fallback(monkeypatch):
-    """When no client is available the composer should return mocked markdown."""
-    monkeypatch.setattr("src.utils.m_ai_client.ClientManager.get_aiproject_client", lambda self: None)
-    agent = ArchitectureComposerAgent()
+    """When a chat client is available the composer should use it to generate markdown."""
+    # Provide a mock chat client exposing `complete(...)` returning a response object
+    class MockChat:
+        def complete(self, *args, **kwargs):
+            class Choice:
+                class Message:
+                    content = "# Proposed Solution Architecture\n\n## a. Purpose\nMocked"
+                message = Message()
+            class Resp:
+                choices = [Choice()]
+            return Resp()
+
+    monkeypatch.setattr("src.utils.m_ai_client.ClientManager.get_chat_completions_client", lambda self: MockChat())
+    agent = ArchitectureComposerAgent(client_manager=ClientManager())
     req = {"objective": "Demo app"}
     result = agent.generate_architecture(req)
     assert "# Proposed Solution Architecture" in result
@@ -55,14 +67,38 @@ def test_architecture_composer_fallback(monkeypatch):
 
 
 def test_intake_reviewer_fallback(monkeypatch):
-    """When no client is available the intake reviewer should return a mocked dict."""
-    monkeypatch.setattr("src.utils.m_ai_client.ClientManager.get_aiproject_client", lambda self: None)
-    reviewer = IntakeReviewerAgent()
+    """When a chat client is available the intake reviewer should parse chat responses."""
+    # Mock chat responses for short and long prompts
+    def make_chat_with(content):
+        class MockChat:
+            def complete(self, *args, **kwargs):
+                class Choice:
+                    class Message:
+                        pass
+                    message = Message()
+                class Resp:
+                    pass
+                mock_choice = Choice()
+                mock_choice.message.content = content
+                resp = Resp()
+                resp.choices = [mock_choice]
+                return resp
+        return MockChat()
+
+    short_json = '{"status": "needs_clarification", "questions": ["Please provide more details on workload."]}'
+    long_json = '{"status": "ready", "requirements": {"objective": "Demo"}}'
+
+    # First test short prompt
+    monkeypatch.setattr("src.utils.m_ai_client.ClientManager.get_chat_completions_client", lambda self: make_chat_with(short_json))
+    reviewer = IntakeReviewerAgent(client_manager=ClientManager())
     short_prompt = "short"
     result = reviewer.review_input(short_prompt)
-    # With less than 5 words it should request clarification
     assert result["status"] == "needs_clarification"
+
+    # Then test long prompt
+    monkeypatch.setattr("src.utils.m_ai_client.ClientManager.get_chat_completions_client", lambda self: make_chat_with(long_json))
+    reviewer = IntakeReviewerAgent(client_manager=ClientManager())
     long_prompt = "This is a sufficiently long prompt describing the workload and constraints"
     result = reviewer.review_input(long_prompt)
     assert result["status"] == "ready"
-    assert isinstance(result["requirements"], dict)
+    assert isinstance(result.get("requirements"), dict)

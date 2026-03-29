@@ -12,7 +12,8 @@ class TestAgenticOrchestrator:
         """
         Ensures the Orchestrator safely instantiates its two sub-agents.
         """
-        orchestrator = AgenticOrchestrator()
+        from unittest.mock import MagicMock
+        orchestrator = AgenticOrchestrator(client_manager=MagicMock())
         
         # It assigns class instances dynamically internally
         assert orchestrator.reviewer is not None
@@ -33,7 +34,8 @@ class TestAgenticOrchestrator:
         mock_composer_instance = mock_composer.return_value
         mock_composer_instance.generate_architecture.return_value = "## Architecture Created"
         
-        orchestrator = AgenticOrchestrator()
+        from unittest.mock import MagicMock
+        orchestrator = AgenticOrchestrator(client_manager=MagicMock())
         
         initial_state = {"phase": "INTAKE"}
         updated_state, response_text = orchestrator.orchestrate_cycle("Create an app.", initial_state)

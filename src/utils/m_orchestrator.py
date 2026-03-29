@@ -1,16 +1,21 @@
 from src.utils.m_log import f_log
 from src.agents.intake_reviewer import IntakeReviewerAgent
 from src.agents.architecture_composer import ArchitectureComposerAgent
+import src.utils.m_ai_client as m_ai_client
 from typing import Dict, Any, Tuple
+
 
 class AgenticOrchestrator:
     """
     State Management Framework utilizing Microsoft Agent Framework (MAF)
     to route between the Intake Reviewer and Architecture Composer effortlessly.
     """
-    def __init__(self) -> None:
-        self.reviewer = IntakeReviewerAgent()
-        self.composer = ArchitectureComposerAgent()
+    def __init__(self, client_manager: m_ai_client.ClientManager) -> None:
+        # Require a shared ClientManager instance created at app bootstrap.
+        if client_manager is None:
+            raise ValueError("client_manager is required for AgenticOrchestrator")
+        self.reviewer = IntakeReviewerAgent(client_manager=client_manager)
+        self.composer = ArchitectureComposerAgent(client_manager=client_manager)
         
     def orchestrate_cycle(self, user_prompt: str, session_state: Dict[str, Any]) -> Tuple[Dict[str, Any], str]:
         """

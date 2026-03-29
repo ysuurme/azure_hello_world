@@ -6,6 +6,7 @@ import base64
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 import streamlit as st
+import src.utils.m_ai_client as m_ai_client
 from src.utils.m_orchestrator import AgenticOrchestrator
 from src.utils.m_diagram_engine import DiagramEngine
 from src.utils.m_persist_design import ArchitecturePersister
@@ -49,8 +50,11 @@ if query:
         try:
             f_log("User initiated Analysis from Streamlit.", c_type="start")
             
-            # Use Orchestrator Natively
-            orchestrator = AgenticOrchestrator()
+            # Use Orchestrator Natively with a single shared ClientManager
+            # Create the shared ClientManager at app bootstrap (use `az login` locally
+            # or set service principal env vars in your .env file).
+            cm = m_ai_client.ClientManager()
+            orchestrator = AgenticOrchestrator(client_manager=cm)
             updated_state, output_text = orchestrator.orchestrate_cycle(query, st.session_state.maf_state)
             
             svg_b64 = None

@@ -11,13 +11,11 @@ class IntakeReviewerAgent:
     """
     Validates user input against the architecture template natively via Live LLM integration.
     """
-    def __init__(self) -> None:
-        # Obtain authenticated client via ClientManager API
-        self.client = m_ai_client.ClientManager().get_aiproject_client()
-        # If the returned client doesn't expose an `inference` surface, fall back to mocked logic.
-        if self.client and not hasattr(self.client, "inference"):
-            f_log("Foundry client has no 'inference' attribute; falling back to mock mode.", c_type="warning")
-            self.client = None
+    def __init__(self, client_manager: m_ai_client.ClientManager) -> None:
+        # Require a shared ClientManager instance to be injected at bootstrap.
+        if client_manager is None:
+            raise ValueError("client_manager is required — create a single shared ClientManager at app bootstrap")
+        self.client_manager = client_manager
         self.template_path = TEMPLATE_PATH
         self._load_template()
         
@@ -43,34 +41,13 @@ class IntakeReviewerAgent:
         """
         f_log(f"IntakeReviewer reviewing prompt: {user_prompt[:50]}...", c_type="process")
 
-        # Treat missing or incomplete clients (no inference surface) as no-client fallback
-        if not self.client or not hasattr(self.client, "inference"):
-            f_log("No live client found or client lacks inference; Falling back to mocked logic.", c_type="warning")
-            if len(user_prompt.split()) < 5:
-                return {"status": "needs_clarification", "questions": ["Please provide more details on workload."]}
-            return {"status": "ready", "requirements": {"objective": user_prompt}}
-        # MVP LLM Integration via Inference Client 
         try:
             f_log("Calling AI Foundry Inference...", c_type="process")
-
-            inference = getattr(self.client, "inference", None)
-            if inference is None:
-                raise AttributeError("Client has no inference attribute")
-
-            # Prefer legacy test-friendly API when available
-            get_completions = getattr(inference, "get_chat_completions", None)
-            if callable(get_completions):
-                response = get_completions(model=AGENT_MODELS["intake_reviewer"], messages=[SystemMessage(content=self.system_prompt), UserMessage(content=user_prompt)])
-            else:
-                # Fall back to the new factory method if present
-                get_client = getattr(inference, "get_chat_completions_client", None)
-                if not callable(get_client):
-                    raise AttributeError("No compatible inference method found on client.inference")
-                chat_client = get_client()
-                response = chat_client.complete(
-                    model=AGENT_MODELS["intake_reviewer"],
-                    messages=[SystemMessage(content=self.system_prompt), UserMessage(content=user_prompt)]
-                )
+            chat = self.client_manager.get_chat_completions_client()
+            response = chat.complete(
+                model=AGENT_MODELS["intake_reviewer"],
+                messages=[SystemMessage(content=self.system_prompt), UserMessage(content=user_prompt)]
+            )
 
             raw_output = response.choices[0].message.content
             # To handle markdown json wrappers securely:

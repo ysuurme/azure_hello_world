@@ -13,14 +13,11 @@ class ArchitectureComposerAgent:
     Core "Maker" Agent using MAF concepts. 
     Queries AI search for capabilities and generates the 5-point architecture markdown.
     """
-    def __init__(self) -> None:
-        # Use the ClientManager API for obtaining an authenticated client.
-        self.client = m_ai_client.ClientManager().get_aiproject_client()
-        # If the returned client doesn't expose an `inference` surface (older/partial clients),
-        # treat it as if no client was provided so the local/mock path is used.
-        if self.client and not hasattr(self.client, "inference"):
-            f_log("Foundry client has no 'inference' attribute; falling back to mock mode.", c_type="warning")
-            self.client = None
+    def __init__(self, client_manager: m_ai_client.ClientManager) -> None:
+        # Require a shared ClientManager instance to be injected at bootstrap.
+        if client_manager is None:
+            raise ValueError("client_manager is required — create a single shared ClientManager at app bootstrap")
+        self.client_manager = client_manager
         self.system_prompt = (
             "You are the Solution Architecture Generator. "
             "Based on the chosen capabilities from the RAG search, produce a highly structured Markdown document exactly matching this standard:\n"
@@ -49,16 +46,8 @@ class ArchitectureComposerAgent:
         f_log("Composer received ready-requirements. Searching capabilities repo.", c_type="process")
         selected_tech = self._retrieve_capabilities(requirements)
         
-        # If client is absent or lacks inference surface, use mocked architecture
-        if not self.client or not hasattr(self.client, "inference"):
-            f_log("No live Foundry Client. Returning mocked Architecture.", c_type="warning")
-            doc = f"# Proposed Solution Architecture\n\n## a. Purpose\nTo fulfill the business objective: {requirements.get('objective', 'Custom App.')}\n\n"
-            doc += f"## b. Decisions\n- We selected **{selected_tech[0]['technology']}** for Compute.\n"
-            doc += "## c. Scenarios Considered with Pros/Cons\n"
-            doc += f"- *Scenario 1 (PaaS)*: {selected_tech[0]['technology']} (Pros: Serverless. Cons: Cold Starts).\n"
-            doc += "## d. Rationale\nThis matches the strict constraints provided during intake.\n\n"
-            doc += f"## e. Implementation Guidelines\nFollow the specific RAG guidelines attached."
-            return doc
+        # Use the chat completions client for LLM drafting.
+        # Do not fallback to mocked output — raise on any missing/incompatible surfaces.
             
         f_log("Drafting 5-point architecture via Azure Foundry...", c_type="process")
 
@@ -73,27 +62,12 @@ class ArchitectureComposerAgent:
         
         try:
             f_log("Calling AI Foundry Inference...", c_type="process")
-
-            # Support both the 2026 SDK (get_chat_completions_client().complete)
-            # and legacy mocks that expose inference.get_chat_completions(...)
-            inference = getattr(self.client, "inference", None)
-            if inference is None:
-                raise AttributeError("Client has no inference attribute")
-
-            # Prefer legacy test-friendly API when available (many tests/mocks expose this)
-            get_completions = getattr(inference, "get_chat_completions", None)
-            if callable(get_completions):
-                response = get_completions(model=AGENT_MODELS["architecture_composer"], messages=[SystemMessage(content=self.system_prompt), UserMessage(content=user_query)])
-            else:
-                # Fall back to the new factory method if present
-                get_client = getattr(inference, "get_chat_completions_client", None)
-                if not callable(get_client):
-                    raise AttributeError("No compatible inference method found on client.inference")
-                chat_client = get_client()
-                response = chat_client.complete(
-                    model=AGENT_MODELS["architecture_composer"],
-                    messages=[SystemMessage(content=self.system_prompt), UserMessage(content=user_query)]
-                )
+            # Use the modern chat completions client returned by ClientManager
+            chat = self.client_manager.get_chat_completions_client()
+            response = chat.complete(
+                model=AGENT_MODELS["architecture_composer"],
+                messages=[SystemMessage(content=self.system_prompt), UserMessage(content=user_query)]
+            )
 
             return response.choices[0].message.content
         except Exception as e:
