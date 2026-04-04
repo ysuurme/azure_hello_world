@@ -65,6 +65,7 @@ tasks:
         If validation fails, fix the issues and re-validate.
         Do NOT create git commits or branches — the listener handles git operations.
         When done, output a summary of changes made."
+        --policy .gemini/policies/tools.toml
 
   agent:listen:
     desc: "Start the local agent listener polling for 'agent:dev' labeled issues"
