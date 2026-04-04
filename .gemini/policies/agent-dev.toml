@@ -1,21 +1,86 @@
 # .gemini/policies/agent-dev.toml
 
+# Base shell authorization (Required for the tool to function headlessly)
 [[rule]]
-description = "Allow the Builder to manage the dev environment"
+description = "Authorize shell capability"
 toolName = "run_shell_command"
-commandPrefix = ["gh", "task", "ruff", "git"]
+decision = "allow"
+priority = 100
+
+[[rule]]
+description = "Allow GitHub CLI"
+toolName = "run_shell_command"
+commandPrefix = "gh"
 decision = "allow"
 priority = 500
 
 [[rule]]
-description = "Hard deny for destructive commands"
+description = "Allow Task runner"
 toolName = "run_shell_command"
-commandPrefix = ["rm", "sudo", "format"]
+commandPrefix = "task"
+decision = "allow"
+priority = 500
+
+[[rule]]
+description = "Allow Ruff linting"
+toolName = "run_shell_command"
+commandPrefix = "ruff"
+decision = "allow"
+priority = 500
+
+[[rule]]
+description = "Allow Git operations"
+toolName = "run_shell_command"
+commandPrefix = "git"
+decision = "allow"
+priority = 500
+
+# Hard deny for destructive commands
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "rm"
 decision = "deny"
 priority = 600
 
 [[rule]]
-description = "Allow file system access"
-toolName = ["read_file", "write_file", "grep_search", "replace_file_content", "multi_replace_file_content", "list_dir"]
+toolName = "run_shell_command"
+commandPrefix = "sudo"
+decision = "deny"
+priority = 600
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "format"
+decision = "deny"
+priority = 600
+
+# File system access
+[[rule]]
+toolName = "read_file"
+decision = "allow"
+priority = 500
+
+[[rule]]
+toolName = "write_file"
+decision = "allow"
+priority = 500
+
+[[rule]]
+toolName = "grep_search"
+decision = "allow"
+priority = 500
+
+[[rule]]
+toolName = "replace_file_content"
+decision = "allow"
+priority = 500
+
+[[rule]]
+toolName = "multi_replace_file_content"
+decision = "allow"
+priority = 500
+
+[[rule]]
+toolName = "list_dir"
 decision = "allow"
 priority = 500
