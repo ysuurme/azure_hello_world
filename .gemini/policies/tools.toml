@@ -1,12 +1,7 @@
 [tools]
-allowed_tools = ["read_file", "write_file", "replace_file_content", "grep_search", "list_dir", "run_shell_command", "shell"]
+allowed_tools = ["view_file", "write_to_file", "replace_file_content", "multi_replace_file_content", "grep_search", "list_dir", "run_shell_command"]
 
 [tools.run_shell_command]
-requires_approval = false
-allowed_commands = ["gh", "task", "ruff", "git"]
-denied_commands = ["rm", "format", "sudo"]
-
-[tools.shell]
 requires_approval = false
 allowed_commands = ["gh", "task", "ruff", "git"]
 denied_commands = ["rm", "format", "sudo"]
