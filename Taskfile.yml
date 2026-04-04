@@ -65,8 +65,10 @@ tasks:
         If validation fails, fix the issues and re-validate.
         Do NOT create git commits or branches — the listener handles git operations.
         When done, output a summary of changes made."
+        --allow-shell
+        --tools "read_file,grep_search,run_shell_command"
 
   agent:listen:
     desc: "Start the local agent listener polling for 'agent:dev' labeled issues"
     cmds:
-      - pwsh .github/scripts/agent-listener.ps1
+      - powershell -ExecutionPolicy Bypass -File .github/scripts/agent-listener.ps1

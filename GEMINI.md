@@ -40,3 +40,8 @@ The `agent-listener.ps1` polls for `agent:dev`-labeled issues. Phase A refines r
 6. **Standard Library First.** Prefer builtins and stdlib over third-party packages.
 7. **Git operations** follow `.agents/skills/git-workflow`: `feature/issue-N` branches, conventional commits, agent self-review, no auto-merge.
 8. **Lint must pass** before any commit: `task lint` (ruff with E, F, I, N, UP rules).
+
+## Tooling Policy
+- **Primary Tool:** You MUST use `run_shell_command` or similar capability limits for all environment interactions.
+- **Allowed Binaries:** `gh`, `task`, `ruff`, `git`.
+- **Constraint:** Do not use raw `pip`, `npm`, or `rm -rf`; always use the project `task` runner or native operations to ensure state protection.
