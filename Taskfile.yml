@@ -66,6 +66,7 @@ tasks:
         Do NOT create git commits or branches — the listener handles git operations.
         When done, output a summary of changes made."
         --policy .gemini/policies/tools.toml
+        --allowed-tools run_shell_command,write_file,read_file,replace_file_content,grep_search,list_dir
 
   agent:listen:
     desc: "Start the local agent listener polling for 'agent:dev' labeled issues"

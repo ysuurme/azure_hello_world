@@ -45,3 +45,9 @@ The `agent-listener.ps1` polls for `agent:dev`-labeled issues. Phase A refines r
 - **Primary Tool:** You MUST use `run_shell_command` or similar capability limits for all environment interactions.
 - **Allowed Binaries:** `gh`, `task`, `ruff`, `git`.
 - **Constraint:** Do not use raw `pip`, `npm`, or `rm -rf`; always use the project `task` runner or native operations to ensure state protection.
+
+## Safety & Boundaries (CRITICAL for Headless Agents)
+- **STRICT PROJECT ROOT BOUNDARY:** You must NEVER modify any files, or run any commands that affect files, outside of this project root directory.
+- **SYSTEM HARM:** When in doubt, do NOT run any commands that could potentially harm the host system. Fall back to safely failing the task.
+- **NO DESTRUCTIVE GLOBAL COMMANDS:** Global state changes (e.g., modifying global Git configs, installing global software) are strictly prohibited.
+- **VERSION CONTROL FREEDOM:** Because the project is under Git version control and the listener orchestrates feature branches, you are free to heavily modify, refactor, and create files *within* the project root. Git provides the safety net.
