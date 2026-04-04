@@ -32,3 +32,15 @@ build/
 # Logs
 logs/
 designs/
+
+# Linting & Testing
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+plan.cache
+.terraform.tfstate.lock.info
