@@ -5,60 +5,54 @@
 
 ## Format
 
-Wrap every issue within blocks so the parser can harvest them.
+Wrap every issue within ISSUE / END_ISSUE blocks so the parser can harvest them.
 
 ---
 
-ISSUE: Provision Azure AI Search via Terraform
-**Goal**: Establish the vector store infrastructure required for the Sentinel's RAG pipeline.
-**Description**: The Architecture Sentinel requires Azure AI Search (Basic SKU with free Semantic Search) to serve as the vector store for capability document retrieval. This infrastructure must be provisioned via Terraform with Entra ID authentication — no API keys.
+ISSUE: Implement Semantic Chunking Tuning for RAG Pipeline
+**Goal**: Optimize retrieval quality by tuning vector chunk sizes and BM25 coefficients based on observed agent behavior.
+**Description**: Once Azure AI Search is provisioned (Terraform issue) and the ingestion pipeline is live (`m_ingest.py`), the default chunking strategy will likely produce suboptimal results. This issue creates evaluation scripts that measure retrieval accuracy and tune semantic configuration to minimize hallucination rates.
 **Requirements**:
-1. Add `azurerm_search_service` resource (Basic SKU) to `infra/main.tf`.
-2. Add `azapi_resource` for `search_connection` linking Search to AI Hub via `authType = "ProjectManagedIdentity"`.
-3. Introduce the `capability_host` resource for Agent Service tool execution.
-4. Configure Terraform remote backend on Azure Blob Storage.
+1. Implement `src/utils/m_ingest.py:ingest_local_markdown()` — walk `/capabilities/`, chunk via Document-Aware Recursive Chunking on natural headers, upload to AI Search with `mergeOrUpload`.
+2. Add idempotency: `H(x) = SHA256(Content + Metadata)`, skip upload if hash unchanged.
+3. Create an evaluation script comparing retrieval results against known-good capability matches.
+4. Parameterize chunk size and BM25 coefficients for iterative tuning.
 **Acceptance Criteria**:
-- `terraform plan -detailed-exitcode` exits cleanly with no drift.
-- Search Service is accessible via Managed Identity from the AI Foundry project.
-- No hardcoded API keys in any `.tf` file.
-END_ISSUE
-
-ISSUE: Implement Trivy Container Security Scanning
-**Goal**: Prevent vulnerable container images from reaching the registry.
-**Description**: The Dockerfile follows a Multi-Stage Rootless pattern but currently lacks automated vulnerability scanning. Trivy must gate the image push to ensure no critical CVEs ship to production.
-**Requirements**:
-1. Add Trivy scan step to the CI pipeline (GitHub Action or Taskfile task).
-2. Configure Trivy to fail on CRITICAL and HIGH severity vulnerabilities.
-3. Output scan results as a GitHub Actions artifact for review.
-**Acceptance Criteria**:
-- `task docker:scan` runs Trivy against the built image locally.
-- CI pipeline blocks PR merge if CRITICAL vulnerabilities are detected.
-- Scan report is downloadable from the Actions tab.
-END_ISSUE
-
-ISSUE: Enforce DefaultAzureCredential Across All Clients
-**Goal**: Guarantee seamless identity transition from local development to Azure Container Apps.
-**Description**: While the agent factory uses `DefaultAzureCredential`, some utility modules may still contain direct credential instantiation. A full audit ensures every Azure SDK client inherits identity from the environment consistently.
-**Requirements**:
-1. Audit `src/utils/` for any direct credential construction outside `DefaultAzureCredential`.
-2. Ensure `ClientManager` in `m_ai_client.py` is the single credential source.
-3. Add integration test verifying credential passthrough from orchestrator to tools.
-**Acceptance Criteria**:
-- `grep -r "api_key\|AzureKeyCredential" src/` returns zero matches.
-- All Azure SDK calls route through `ClientManager`.
+- `task ingest` runs the full ingestion pipeline against `/capabilities/`.
+- Idempotent: re-running on unchanged files produces zero uploads.
+- Evaluation script outputs precision/recall metrics for the test query set.
 - Test file added to `/tests`.
 END_ISSUE
 
-ISSUE: Add Application Insights Observability to Maker-Checker Loop
-**Goal**: Enable production monitoring of the agent's reasoning traces and decision paths.
-**Description**: The Maker-Checker loop currently logs locally via `m_log.py`. Application Insights integration will expose reasoning traces, tool invocations, and latency metrics to the Azure Portal for Day-2 operations.
+ISSUE: Add VNet and Private Link Network Isolation for PaaS Services
+**Goal**: Enforce network-level blast radius isolation for AI Search and AI Foundry in production.
+**Description**: The Terraform infrastructure issue provisions Azure AI Search and Foundry connections but exposes them on public endpoints. Production deployments require VNet integration with Private Endpoints (Private Link) so that AI Search, AI Foundry, and the Container App communicate exclusively over Microsoft's backbone — no public internet traversal.
 **Requirements**:
-1. Add `azure-monitor-opentelemetry` to project dependencies via `uv add`.
-2. Create `src/utils/m_telemetry.py` wrapping OpenTelemetry instrumentation.
-3. Instrument the `AgenticOrchestrator` state transitions (INTAKE → GENERATION → COMPLETE).
-4. Expose trace IDs in Streamlit UI for debugging.
+1. Create a VNet with dedicated subnets for AI Search, AI Foundry, and Container Apps in `infra/main.tf`.
+2. Add `azurerm_private_endpoint` resources for AI Search and AI Foundry linking to the VNet.
+3. Configure Private DNS Zones (`privatelink.search.windows.net`, `privatelink.cognitiveservices.azure.com`) for name resolution.
+4. Update the Container App environment to inject into the VNet subnet.
+5. Disable public network access on AI Search and Foundry once Private Link is verified.
 **Acceptance Criteria**:
-- Traces appear in Application Insights within 60 seconds of agent invocation.
-- Each orchestrator state transition is a distinct span.
-- Test file verifying telemetry facade initialization added to `/tests`.
+- `terraform plan` succeeds with VNet, Private Endpoints, and DNS Zones in the graph.
+- AI Search is unreachable from public internet; only accessible via Private Endpoint.
+- Container App resolves AI Search and Foundry endpoints via Private DNS.
+- Test connectivity from within the VNet validates end-to-end RAG pipeline.
 END_ISSUE
+
+ISSUE: Add Terraform Drift Detection Gate to CI Pipeline
+**Goal**: Prevent infrastructure drift from going undetected between deployments.
+**Description**: The current `pr-checks.yml` validates code quality (lint + test) but does not enforce infrastructure consistency. Adding `terraform plan -detailed-exitcode` as a CI gate ensures that any merged PR containing Terraform changes produces a clean plan — exit code 0 (no changes) or 2 (changes to apply) — and flags unexpected drift before it reaches production.
+**Requirements**:
+1. Add a `terraform-plan` job to `.github/workflows/pr-checks.yml` triggered on changes to `infra/**`.
+2. Configure Azure credentials in GitHub Actions via OIDC federated identity (no stored secrets).
+3. Run `terraform init` with the remote backend, then `terraform plan -detailed-exitcode`.
+4. Fail the PR if exit code is non-zero and changes are unexpected.
+5. Post plan output as a PR comment for review transparency.
+**Acceptance Criteria**:
+- PRs modifying `infra/` trigger the Terraform plan job.
+- Plan output is visible as a PR comment.
+- Unexpected drift (exit code 1) blocks merge.
+- GitHub Actions uses OIDC — no `AZURE_CLIENT_SECRET` stored in repo secrets.
+END_ISSUE
+

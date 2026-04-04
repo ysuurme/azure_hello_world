@@ -182,6 +182,16 @@ task agent:listen
 | `agents.md` | Deep architecture — design philosophy, learning goals, session instructions. |
 | `.agents/skills/` | Coding enforcement protocols (`review-code`, `design-architecture`, `design-infrastructure`, `git-workflow`). |
 | `Taskfile.yml` | Single source of truth for all commands. `task --list` to discover. |
-| `ISSUES.md` | Agile issue manifest. `task sync` pushes to GitHub. |
+| `ISSUES.md` | **Single source of truth for the project roadmap.** All future improvements, features, and bugs are written here. |
 
+### Adding Improvements
 
+All future work — features, bugs, refactors — must be captured as `ISSUE:…END_ISSUE` blocks in `ISSUES.md`. This replaces any standalone implementation plans or task trackers.
+
+```
+1. Write the issue in ISSUES.md (Goal / Description / Requirements / Acceptance Criteria)
+2. Run `task sync` to push to GitHub and the @hello_architect project
+3. Label with `agent:dev` for automated execution, or work it manually
+```
+
+This ensures every improvement is tracked in GitHub, reviewable from mobile, and executable by the agent listener.
