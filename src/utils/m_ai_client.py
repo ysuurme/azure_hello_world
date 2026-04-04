@@ -14,7 +14,7 @@ load_dotenv()
 _cached_aiproject_client: projects.AIProjectClient | None = None
 
 
-class AuthManager:
+class _AuthManager:
     """Manage Azure authentication.
 
     Uses DefaultAzureCredential which supports:
@@ -23,11 +23,17 @@ class AuthManager:
     - managed identity (when running in Azure)
     """
 
+    def __init__(self) -> None:
+        self._cached_credential: Any = None
+
     def get_azure_credential(self) -> Any:
-        """Return a DefaultAzureCredential instance.
+        """Return a DefaultAzureCredential instance (cached).
 
         Raises ClientAuthenticationError when credentials cannot be created.
         """
+        if self._cached_credential is not None:
+            return self._cached_credential
+
         try:
             # If the app is configured to *explicitly* use a service principal,
             # require the SP env vars to be present and non-empty. Otherwise,
@@ -51,6 +57,7 @@ class AuthManager:
 
             cred = DefaultAzureCredential()
             f_log("Created DefaultAzureCredential.", c_type="debug")
+            self._cached_credential = cred
             return cred
         except ClientAuthenticationError as e:
             f_log(f"Azure authentication failed: {e}", c_type="error")
@@ -69,8 +76,12 @@ class ClientManager:
     OpenAI-style client from `AIProjectClient.get_openai_client()`.
     """
 
-    def __init__(self, auth: AuthManager | None = None) -> None:
-        self.auth = auth or AuthManager()
+    def __init__(self) -> None:
+        self._auth = _AuthManager()
+
+    def get_credential(self) -> Any:
+        """Return the shared credential from the internal AuthManager."""
+        return self._auth.get_azure_credential()
 
     def get_aiproject_client(self) -> projects.AIProjectClient:
         """Return an authenticated `AIProjectClient` for Azure AI Foundry.
@@ -87,24 +98,28 @@ class ClientManager:
             return _cached_aiproject_client
 
         f_log("Initializing Azure credential for AIProjectClient.", c_type="process")
-        cred = self.auth.get_azure_credential()
+        cred = self.get_credential()
 
         try:
-            # Connection-string style
+            # Handle potential connection strings by extracting the endpoint
+            # In AIProjectClient 2.0.1, constructor expects `endpoint` as first arg.
+            clean_endpoint = endpoint
             if ";" in endpoint:
-                client = projects.AIProjectClient.from_connection_string(conn_str=endpoint)  # type: ignore
-            else:
-                clean = endpoint.replace("endpoint=", "").strip()
-                client = projects.AIProjectClient(endpoint=clean, credential=cred)
-
+                # Basic parsing: find endpoint=...
+                for part in endpoint.split(";"):
+                    if part.strip().startswith("endpoint="):
+                        clean_endpoint = part.split("=", 1)[1].strip()
+                        break
+            
+            clean_endpoint = clean_endpoint.replace("endpoint=", "").strip()
+            
+            client = projects.AIProjectClient(endpoint=clean_endpoint, credential=cred)
             _cached_aiproject_client = client
             f_log("AIProjectClient initialized.", c_type="success")
             return client
         except Exception as e:
             f_log(f"Failed to initialize AIProjectClient: {e}", c_type="error")
             raise
-
-    # Legacy chat completions client removed. Use `get_openai_client()` instead.
 
     def get_openai_client(self):
         """Return an OpenAI-style client from the AIProjectClient.
@@ -125,5 +140,3 @@ class ClientManager:
                 "— update SDK or use a different surface"
             )
         return get_client()
-
-
