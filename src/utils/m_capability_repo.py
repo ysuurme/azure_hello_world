@@ -1,8 +1,11 @@
 import os
+from typing import Any
+
 import yaml
-from typing import Dict, Any, List
-from src.utils.m_log import f_log
+
 from src.utils.m_ingest import IngestionPipeline
+from src.utils.m_log import f_log
+
 
 class CapabilityRepository:
     """
@@ -16,7 +19,7 @@ class CapabilityRepository:
         if not os.path.exists(self.storage_path):
             os.makedirs(self.storage_path)
 
-    def write_capability(self, filename: str, frontmatter: Dict[str, Any], body: str) -> str:
+    def write_capability(self, filename: str, frontmatter: dict[str, Any], body: str) -> str:
         f_log(f"Writing capability {filename}", c_type="process")
         full_path = os.path.join(self.storage_path, filename)
         

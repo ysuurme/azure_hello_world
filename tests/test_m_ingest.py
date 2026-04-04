@@ -1,5 +1,5 @@
-import pytest
 from src.utils.m_ingest import IngestionPipeline
+
 
 def test_generate_document_hash():
     pipeline = IngestionPipeline(search_client=None)

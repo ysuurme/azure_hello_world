@@ -1,6 +1,7 @@
-import pytest
 from unittest.mock import patch
+
 from src.utils.m_tools import calculate_cost
+
 
 @patch('src.utils.m_tools.requests.get')
 def test_calculate_cost_api_success(mock_get):

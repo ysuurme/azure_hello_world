@@ -18,13 +18,12 @@ Logging profiles (set LOG_PROFILE in config.py):
 ###############################################################################
 
 import logging
-import os
 import textwrap
 import time
 from functools import wraps
-from pathlib import Path
-from src.config import LOG_PROFILE, LOG_SEPARATOR_WIDTH, LOG_LINE_WIDTH, DIR_LOG
+
 import src.config as config
+from src.config import DIR_LOG, LOG_LINE_WIDTH, LOG_PROFILE, LOG_SEPARATOR_WIDTH
 
 ###############################################################################
 # CONFIGURATION CONSTANTS (Self-Contained)
@@ -183,7 +182,11 @@ def setup_logging(profile: str = None) -> None:
     # Startup informational log for TEST profile: indicate chosen Azure auth mode
     if active_profile == "TEST":
         auth_mode = "service_principal" if getattr(config, "USE_AZURE_SERVICE_PRINCIPAL", False) else "cli"
-        _logger.info(f"Startup: Azure auth mode selected: {auth_mode} (AZURE_AUTH_MODE={getattr(config, 'AZURE_AUTH_MODE', 'cli')})")
+        azure_auth_mode = getattr(config, 'AZURE_AUTH_MODE', 'cli')
+        _logger.info(
+            f"Startup: Azure auth mode selected: {auth_mode} "
+            f"(AZURE_AUTH_MODE={azure_auth_mode})"
+        )
 
     _is_configured = True
 

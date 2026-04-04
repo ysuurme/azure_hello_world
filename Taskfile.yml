@@ -52,9 +52,19 @@ tasks:
       - ssh -T git@github.com || true
 
   agent:dev:
-    desc: "Agent-driven development task (called by agent-listener with ISSUE= variable)"
+    desc: "Agent-driven development — reads issue, implements, validates via Gemini CLI"
     cmds:
-      - echo "Agent development task for issue #{{.ISSUE}} — placeholder for Gemini CLI integration"
+      - >-
+        gemini -p
+        "You are the Builder agent working on GitHub issue #{{.ISSUE}}.
+        Read the full issue with: gh issue view {{.ISSUE}}.
+        Follow all rules in GEMINI.md and agents.md.
+        Use .agents/skills/ for coding standards.
+        Implement the requirements from the issue.
+        Validate by running: task test && task lint.
+        If validation fails, fix the issues and re-validate.
+        Do NOT create git commits or branches — the listener handles git operations.
+        When done, output a summary of changes made."
 
   agent:listen:
     desc: "Start the local agent listener polling for 'agent:dev' labeled issues"

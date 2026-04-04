@@ -1,9 +1,10 @@
-import os
 import json
-from src.utils.m_log import f_log
+import os
+from typing import Any
+
 import src.utils.m_ai_client as m_ai_client
 from src.config import AGENT_MODELS, TEMPLATE_PATH
-from typing import Dict, Any
+from src.utils.m_log import f_log
 
 # Use Foundry/OpenAI-style responses client via AIProjectClient.get_openai_client()
 
@@ -23,19 +24,22 @@ class IntakeReviewerAgent:
             "You are the Intake Reviewer for an Architecture Sentinel. "
             f"Your job is to review the user's software description against this template: \n{self.template}\n"
             "If the user has not provided enough information, return a JSON object exactly like this: "
-            '{"status": "needs_clarification", "questions": ["Question 1", "Question 2"]} '
+            '{"status": "needs_clarification", "questions": '
+            '["Question 1", "Question 2"]} '
             "If the information is sufficient, return exactly: "
-            '{"status": "ready", "requirements": {"objective": "...", "workload": "...", "data": "...", "integration": "...", "constraints": "..."}}'
+            '{"status": "ready", "requirements": {"objective": "...", '
+            '"workload": "...", "data": "...", "integration": "...", '
+            '"constraints": "..."}}'
         )
 
     def _load_template(self) -> None:
         if os.path.exists(self.template_path):
-            with open(self.template_path, "r", encoding="utf-8") as f:
+            with open(self.template_path, encoding="utf-8") as f:
                 self.template = f.read()
         else:
             self.template = "Standard 5-pillar architecture template."
 
-    def review_input(self, user_prompt: str) -> Dict[str, Any]:
+    def review_input(self, user_prompt: str) -> dict[str, Any]:
         """
         Executes the intake review process, invoking live Azure OpenAI if client exists.
         """
@@ -58,4 +62,5 @@ class IntakeReviewerAgent:
             return json.loads(clean_json)
         except Exception as e:
             f_log(f"Azure Inference Failure: {str(e)}", c_type="error")
-            return {"status": "needs_clarification", "questions": [f"I encountered a service fault analyzing your request: {e}"]}
+            error_msg = f"I encountered a service fault analyzing your request: {e}"
+            return {"status": "needs_clarification", "questions": [error_msg]}

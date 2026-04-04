@@ -1,34 +1,41 @@
-import sys
-import os
 import base64
+import os
+import sys
 
 # Ensure the project root is always in path to resolve 'src.' module imports natively
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 import streamlit as st
+
 import src.utils.m_ai_client as m_ai_client
-from src.utils.m_orchestrator import AgenticOrchestrator
 from src.utils.m_diagram_engine import DiagramEngine
-from src.utils.m_persist_design import ArchitecturePersister
 from src.utils.m_log import f_log, setup_logging
+from src.utils.m_orchestrator import AgenticOrchestrator
+from src.utils.m_persist_design import ArchitecturePersister
 
 setup_logging()
 st.set_page_config(page_title="Azure Architecture Agent", layout="wide")
 st.title("Architecture Agent 🛡️")
 st.markdown("### Technical Design Authority Agent")
 
+WELCOME_MESSAGE = "Welcome. Please describe the architecture you want to build."
+
 # Session state initialization
 if "maf_state" not in st.session_state:
     st.session_state.maf_state = {}
 if "chat_history" not in st.session_state:
-    st.session_state.chat_history = [{"role": "assistant", "type": "text", "content": "Welcome. Please describe the architecture you want to build."}]
+    st.session_state.chat_history = [
+        {"role": "assistant", "type": "text", "content": WELCOME_MESSAGE}
+    ]
     
 with st.sidebar:
     st.header("Configuration")
     st.info("Running Lean MVP locally with direct orchestrator bindings.")
     if st.button("Reset Session"):
         st.session_state.maf_state = {}
-        st.session_state.chat_history = [{"role": "assistant", "type": "text", "content": "Welcome. Please describe the architecture you want to build."}]
+        st.session_state.chat_history = [
+            {"role": "assistant", "type": "text", "content": WELCOME_MESSAGE}
+        ]
         st.rerun()
 
 # Display chat history Context

@@ -1,7 +1,8 @@
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from src.agents.architecture_composer import ArchitectureComposerAgent
 from src.utils.m_ai_client import ClientManager
+
 
 class TestArchitectureComposerAgent:
 
@@ -20,7 +21,12 @@ class TestArchitectureComposerAgent:
             def complete(self, *args, **kwargs):
                 class Choice:
                     class Message:
-                        content = "# Proposed Solution Architecture\n\n## a. Purpose\nTo fulfill the business objective: Enterprise B2B API\n\n## b. Decisions"
+                        content = (
+                            "# Proposed Solution Architecture\n\n"
+                            "## a. Purpose\nTo fulfill the business "
+                            "objective: Enterprise B2B API\n\n"
+                            "## b. Decisions"
+                        )
                     message = Message()
                 class Resp:
                     choices = [Choice()]
@@ -29,15 +35,20 @@ class TestArchitectureComposerAgent:
         # Build a context manager mock that returns an object with responses.create
         class CM:
             def __enter__(self):
-                class O:
+                class OpenAIClient:
                     def __init__(self):
                         class Responses:
                             def create(self, model, input):
                                 class Resp:
-                                    output_text = "# Proposed Solution Architecture\n\n## a. Purpose\nTo fulfill the business objective: Enterprise B2B API\n\n## b. Decisions"
+                                    output_text = (
+                                        "# Proposed Solution Architecture\n\n"
+                                        "## a. Purpose\nTo fulfill the business "
+                                        "objective: Enterprise B2B API\n\n"
+                                        "## b. Decisions"
+                                    )
                                 return Resp()
                         self.responses = Responses()
-                return O()
+                return OpenAIClient()
             def __exit__(self, exc_type, exc, tb):
                 return False
 
@@ -71,13 +82,13 @@ class TestArchitectureComposerAgent:
         # Create a context manager yielding an object with responses.create() returning mock_response-like output
         class CM2:
             def __enter__(self):
-                class O:
+                class OpenAIClient:
                     def __init__(self):
                         class Responses:
                             def create(self, model, input):
                                 return mock_response
                         self.responses = Responses()
-                return O()
+                return OpenAIClient()
             def __exit__(self, exc_type, exc, tb):
                 return False
 

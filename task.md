@@ -1,55 +1,44 @@
 # Project Setup: Azure Architecture Sentinel
 
-## Phase 1: Local Development & SpecKit (Completed)
-- [x] Rename existing `MyHobbyAgent` to `AdvisorTrigger`
-- [x] Implement `src/agents/arch_advisor.py`
-- [x] Implement `src/utils/agent_factory.py`
-- [x] Implement `src/utils/ingestion.py`
-- [x] Implement `src/utils/search_helpers.py`
-- [x] Implement `src/utils/tools.py`
-- [x] Write Unit Tests
-- [x] **[Sentinel Audit]** Atomize `calculate_cost` in `tools.py` to `<30 lines`
-- [x] **[Sentinel Audit]** Implement Unified Telemetry Facade (`m_log.py`) and delete fragmented `import logging`.
+## Phase 1: Local Development & SpecKit — Completed
+- [x] `src/agents/arch_advisor.py` — TDA agent with Maker-Checker loop
+- [x] `src/utils/` — agent factory, ingestion, search, tools, logging
+- [x] Unit tests covering cost calculation and telemetry paths
+- [x] Sentinel Audit: atomized `calculate_cost` (<30 lines), unified `m_log.py`
 
-## Phase 1.5: Frontend Validation (MVA) — Completed
-- [x] Architecture doc `001_mva_local_setup.md`
-- [x] Implement `src/ui/app.py` (Streamlit)
-- [x] **[Sentinel Audit]** Flatten Code Geometry in `app.py` via Guard Clauses & Type Hints.
-- [x] **[Sentinel Audit]** Implement the Thin Mediator (`api_adapter.py`) to decouple the UI from HTTP operations.
+## Phase 1.5a: Frontend Validation (MVA) — Completed
+- [x] `src/ui/app.py` — Streamlit with Guard Clauses, Thin Mediator (`api_adapter.py`)
+- [x] Dev environment: `docker-compose.dev.yml`, `pyproject.toml`, workspace interpreter
 
-## Dev Environment Modernization — Completed
-- [x] Configure workspace interpreter → `.venv/Scripts/python.exe`
-- [x] Update `entrypoint.sh` with `exec` to manage container lifecycles securely.
-- [x] Create `docker-compose.dev.yml` and `.env`
-- [x] Remove stale `requirements.txt` / Configure `pyproject.toml`
-- [x] Rewrite `README.md` (Agentic `.agents/skills` framework integration)
-- [x] Update `implementation_plan.md` to guarantee structural reproducibility.
-
-## Phase 1.5: Headless Agentic Ecosystem — Completed
-- [x] Create `GEMINI.md` (thin structural map for Gemini CLI)
-- [x] Add `ruff` via `uv add --dev ruff` + config
-- [x] Create `sync-issues.ps1` (parameterized, replaces `sync-todo.ps1`)
-- [x] Create `ISSUES.md` with seed issues
-- [x] Expand `Taskfile.yml` (dev, test, lint, docker, sync, agent tasks)
-- [x] Create `agent-listener.ps1` (two-phase Refine → Develop)
-- [x] Delete `.agents/workflows/` (Taskfile subsumes)
-- [x] Delete `sync-todo.ps1` (replaced by `sync-issues.ps1`)
-- [x] Update `README.md` with agentic development + governance sections
-- [x] Create `.github/workflows/pr-checks.yml` (MVP CI)
+## Phase 1.5b: Headless Agentic Ecosystem — Completed
+- [x] `GEMINI.md` — structural map (layout, rules, git workflow, agentic dev)
+- [x] `Taskfile.yml` — 11 tasks: dev, test, lint, lint:fix, docker:build/down, sync/sync:dry, agent:dev/listen, status
+- [x] `ruff` — E, F, I, N, UP rules, line-length 120, lint passes clean (0 errors)
+- [x] `ISSUES.md` — 4 seed issues, ISSUE/END_ISSUE block format
+- [x] `sync-issues.ps1` — parameterized project name, auto-removes synced issues
+- [x] `agent-listener.ps1` — two-phase Refine → Develop, validated workflow:
+  - `feature/issue-N` branches, `feat(#N): Title` commits
+  - Gemini CLI builder, agent self-review on PR
+  - `agent:review` label handoff, `@hello_architect` project routing
+- [x] `pr-checks.yml` — ruff + pytest on every PR to main
+- [x] `git-workflow` skill — TDD-validated, 6 baseline hallucination patterns documented
+- [x] Deleted `.agents/workflows/` (Taskfile subsumes), `sync-todo.ps1` (replaced)
+- [x] README.md — full validated workflow diagram, governance table
 
 ## Phase 2: Infrastructure Provisioning
-- [ ] `infra/main.tf` — AI Search, Capability Host, AI Foundry (Entra ID)
-- [ ] Enforce **Azure Blob Storage** as the locked Terraform remote backend.
-- [ ] VNet and Private endpoints (Private Link) in Terraform for PaaS Isolation.
-- [ ] Enforce `terraform plan -detailed-exitcode` drift detection CI/CD gates.
+- [ ] `infra/main.tf` — AI Search (Basic SKU), Capability Host, AI Foundry (Entra ID)
+- [ ] Terraform remote backend on Azure Blob Storage
+- [ ] VNet + Private Link for PaaS isolation
+- [ ] `terraform plan -detailed-exitcode` drift detection in CI
 
 ## Phase 3: Containerization & Deployment
-- [x] Standardize Local Docker tooling around `uv`.
-- [x] **[Sentinel Audit]** Rewrite `Dockerfile` to enforce **Multi-Stage Rootless** execution minimizing Blast Radius.
-- [x] **[Sentinel Audit]** Implement Standard Library `HEALTHCHECK`.
-- [ ] Implement Trivy security scans prior to image registry push.
-- [ ] Enforce `DefaultAzureCredential` across all clients to assume ACA Managed Identity.
+- [x] Multi-Stage Rootless Dockerfile, Standard Library HEALTHCHECK
+- [ ] Trivy security scans gating image push
+- [ ] `DefaultAzureCredential` audit across all SDK clients
 
 ## Phase 4: Continuous Evaluation
-- [ ] Application Insights hooks wrapped around Maker-Checker logic.
-- [ ] Semantic Chunking tuning scripts based on hallucination thresholds.
+- [ ] Application Insights via `azure-monitor-opentelemetry` on Maker-Checker loop
+- [ ] Semantic chunking tuning (vector sizes, BM25 coefficients)
+
+## Pending Manual Actions
+- [x] Run `gh repo edit --delete-branch-on-merge` to enable auto-branch cleanup

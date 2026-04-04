@@ -1,17 +1,17 @@
 import os
-from dotenv import load_dotenv
-load_dotenv()
-
-from typing import Optional, Any
-
-from src.utils.m_log import f_log
-import src.config as config
+from typing import Any
 
 import azure.ai.projects as projects
 from azure.core.exceptions import ClientAuthenticationError
+from dotenv import load_dotenv
+
+import src.config as config
+from src.utils.m_log import f_log
+
+load_dotenv()
 
 # Module-level cache to avoid re-initialisation and duplicate logs
-_cached_aiproject_client: Optional[projects.AIProjectClient] = None
+_cached_aiproject_client: projects.AIProjectClient | None = None
 
 
 class AuthManager:
@@ -36,7 +36,9 @@ class AuthManager:
             if config.USE_AZURE_SERVICE_PRINCIPAL:
                 missing = [v for v in ("AZURE_CLIENT_ID", "AZURE_TENANT_ID", "AZURE_CLIENT_SECRET") if not os.getenv(v)]
                 if missing:
-                    raise RuntimeError(f"AZURE_AUTH_MODE is set to service principal but missing env vars: {', '.join(missing)}")
+                    raise RuntimeError(
+                        f"AZURE_AUTH_MODE is set to service principal but missing env vars: {', '.join(missing)}"
+                    )
             else:
                 for _v in ("AZURE_CLIENT_ID", "AZURE_TENANT_ID", "AZURE_CLIENT_SECRET"):
                     _val = os.getenv(_v)
@@ -67,7 +69,7 @@ class ClientManager:
     OpenAI-style client from `AIProjectClient.get_openai_client()`.
     """
 
-    def __init__(self, auth: Optional[AuthManager] = None) -> None:
+    def __init__(self, auth: AuthManager | None = None) -> None:
         self.auth = auth or AuthManager()
 
     def get_aiproject_client(self) -> projects.AIProjectClient:
@@ -118,7 +120,10 @@ class ClientManager:
         aiproject = self.get_aiproject_client()
         get_client = getattr(aiproject, "get_openai_client", None)
         if not callable(get_client):
-            raise RuntimeError("AIProjectClient does not expose 'get_openai_client' — update SDK or use a different surface")
+            raise RuntimeError(
+                "AIProjectClient does not expose 'get_openai_client' "
+                "— update SDK or use a different surface"
+            )
         return get_client()
 
 

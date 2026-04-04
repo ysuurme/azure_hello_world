@@ -1,8 +1,9 @@
-from src.utils.m_log import f_log
-from src.agents.intake_reviewer import IntakeReviewerAgent
-from src.agents.architecture_composer import ArchitectureComposerAgent
+from typing import Any
+
 import src.utils.m_ai_client as m_ai_client
-from typing import Dict, Any, Tuple
+from src.agents.architecture_composer import ArchitectureComposerAgent
+from src.agents.intake_reviewer import IntakeReviewerAgent
+from src.utils.m_log import f_log
 
 
 class AgenticOrchestrator:
@@ -17,7 +18,7 @@ class AgenticOrchestrator:
         self.reviewer = IntakeReviewerAgent(client_manager=client_manager)
         self.composer = ArchitectureComposerAgent(client_manager=client_manager)
         
-    def orchestrate_cycle(self, user_prompt: str, session_state: Dict[str, Any]) -> Tuple[Dict[str, Any], str]:
+    def orchestrate_cycle(self, user_prompt: str, session_state: dict[str, Any]) -> tuple[dict[str, Any], str]:
         """
         Manages the transition state without blocking the Streamlit UI.
         Returns a tuple: (State Update Dict, Output Text/Markdown).

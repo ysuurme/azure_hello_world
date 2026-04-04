@@ -1,9 +1,10 @@
 import os
 import subprocess
 import tempfile
-from src.utils.m_log import f_log
+
 from src.config import D2_BINARY_PATH
-from typing import Optional
+from src.utils.m_log import f_log
+
 
 class DiagramEngine:
     """
@@ -12,7 +13,7 @@ class DiagramEngine:
     def __init__(self, binary_path: str = None) -> None:
         self.binary_path = binary_path or D2_BINARY_PATH
         
-    def generate_svg(self, d2_syntax: str) -> Optional[bytes]:
+    def generate_svg(self, d2_syntax: str) -> bytes | None:
         """
         Takes raw .d2 syntactical mapping, compiles it, and returns the SVG bytes.
         """
@@ -28,7 +29,7 @@ class DiagramEngine:
                 
             try:
                 # Standard library boundary: invoke the static binary
-                process = subprocess.run(
+                subprocess.run(
                     [self.binary_path, input_file, output_file],
                     capture_output=True,
                     text=True,

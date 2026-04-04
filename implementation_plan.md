@@ -33,22 +33,28 @@ To successfully reproduce and extend this architecture, developers or AI Agents 
 ---
 
 ### Phase 1.5: Headless Agentic Ecosystem
-*Status: Completed. Focus: GitHub-driven development loop, automation scaffolding, governance.*
+*Status: Completed. Focus: GitHub-driven development loop, governance, automation.*
 
-#### Project Governance Model (Implemented)
-- `GEMINI.md`: Thin structural map for Gemini CLI (repository layout, rules, cross-references).
-- `agents.md`: Deep architectural context (design philosophy, learning goals, session instructions).
-- `Taskfile.yml`: Single source of truth for all automation commands (`task --list`).
+#### Governance (Implemented)
+- `GEMINI.md`: Thin structural map consumed by Gemini CLI. Layout, rules, git workflow, agentic dev summary.
+- `agents.md`: Deep architecture — design philosophy, learning goals, session operating instructions.
+- `Taskfile.yml`: Single command authority. 11 tasks covering dev, test, lint, docker, sync, agent operations.
 
-#### Automation Infrastructure (Implemented)
-- `Taskfile.yml`: Expanded with `dev`, `test`, `lint`, `lint:fix`, `docker:build`, `docker:down`, `sync`, `sync:dry`, `agent:dev`, `agent:listen` tasks. Parameterized `GITHUB_PROJECT` variable for cross-repo reuse.
-- `.github/scripts/sync-issues.ps1`: Parses `ISSUES.md` into GitHub Issues (parameterized project name, replaces `sync-todo.ps1`).
-- `.github/scripts/agent-listener.ps1`: Two-phase local listener (Refine → Develop) with error recovery. **Temporary architecture** — future target is GitHub Codespaces.
-- `.github/workflows/pr-checks.yml`: MVP CI running `ruff check` + `pytest` on every PR to `main`.
-- `ISSUES.md`: Agile issue tracking manifest using `ISSUE:…END_ISSUE` block format.
+#### Validated Agent Pipeline (Implemented)
+End-to-end flow: `agent:dev` label → listener pickup → refine → `feature/issue-N` branch → Gemini CLI builder → `feat(#N): Title` commit → PR with `Closes #N` → agent self-review on PR → `agent:review` label → human approval → merge → branch auto-deleted.
+
+- **Builder**: Gemini CLI via `task agent:dev ISSUE=N`. Reads issue, follows `GEMINI.md`, implements, validates with `task test && task lint`.
+- **Critic**: GitHub Action `pr-checks.yml` runs `ruff check` + `pytest` on every PR to `main`.
+- **Plumbing**: `gh` CLI manages labels, branches, PRs, issue comments throughout.
+
+#### Automation Scripts (Implemented)
+- `sync-issues.ps1`: Parses `ISSUES.md` `ISSUE:…END_ISSUE` blocks → `gh issue create`. Auto-removes synced issues. Parameterized `$ProjectName`.
+- `agent-listener.ps1`: Polls for `agent:dev` issues. Phase A refines raw issues. Phase B creates `feature/issue-N` branch, runs Gemini CLI, commits, creates PR, posts agent self-review, hands off to Review lane.
+- `pr-checks.yml`: `ruff check src/ tests/` + `pytest tests/ -v` on every PR to `main`.
 
 #### Code Quality (Implemented)
-- `ruff` added as dev dependency via `uv add --dev ruff`. Configured in `pyproject.toml` with `E, F, I, N, UP` rule sets.
+- `ruff` (dev dependency): E, F, I, N, UP rules. Line length 120. `task lint` / `task lint:fix`.
+- `git-workflow` skill: TDD-validated protocol documenting 6 baseline hallucination patterns and their fixes.
 
 ---
 
@@ -67,26 +73,22 @@ To successfully reproduce and extend this architecture, developers or AI Agents 
 *Status: Completed (Local). Focus: Translating into ACA production environments.*
 
 #### `Dockerfile` (Implemented)
-- Complete implementation of the **Multi-Stage Rootless Pattern**.
-- *Layer 1 (Builder)*: Secures OS packages, utilizes `uv` to build the frozen Python `.venv`.
-- *Layer 2 (Runtime)*: Distroless/Slim equivalent execution under `USER appuser`. Stripped of all `curl`/`gpg` risk vectors. Natively exposes Standard Library ping `HEALTHCHECK`.
+- Multi-Stage Rootless Pattern. Builder layer uses `uv` for frozen `.venv`. Runtime layer runs under `USER appuser` with Standard Library `HEALTHCHECK`.
 
-#### Update Identity Frameworks
-- Ensure all connections inside `agent_factory.py`, `ingestion.py`, and `tools.py` explicitly default to `DefaultAzureCredential` from `azure-identity`. This automatically swaps from local `az login` to the Managed System-Assigned Identity of the Azure Container App.
+#### Identity Frameworks
+- All Azure SDK clients route through `ClientManager` using `DefaultAzureCredential`. Swaps from local `az login` to ACA Managed Identity automatically.
 
 ---
 
 ### Phase 4: Continuous Evaluation and Refinement
 *Status: Pending. Focus: Day-2 Operations and Observability.*
 
-#### `src/utils/evaluation.py`
-- Implementing Application Insights tracing wrapped around the Agent Foundry calls to monitor the "Maker-Checker" loop paths.
-- Scripts to fine-tune semantic configuration in AI search (e.g., adjusting vector chunk sizes or BM25 coefficients based on observed agent hallucination rates).
+- Application Insights tracing around Maker-Checker loop via `azure-monitor-opentelemetry`.
+- Semantic chunking tuning based on observed hallucination rates (vector chunk sizes, BM25 coefficients).
 
 ## Verification Plan
 
-Because this is an evolving architecture, validation is codified in the deployment layers:
-- **Phase 1 Validation:** Local tests confirm the agent's MCP tools calculate costs correctly and `m_log` records semantic reasoning paths.
-- **Phase 1.5 Validation:** `task --list` displays all tasks. `task sync:dry` parses `ISSUES.md` correctly. `pr-checks.yml` triggers on PR. Agent listener handles label lifecycle (visible from mobile).
-- **Phase 2 Validation:** `terraform apply` succeeds cleanly; the Foundry project is connected to the Search Index via Entra ID without hardcoded secrets.
-- **Phase 3 Validation:** ACA URL returns a valid response asserting the Managed Identity natively acts as the Sentinel. Trivy container scans pass successfully.
+- **Phase 1:** Tests confirm MCP tools calculate costs correctly. `m_log` records semantic reasoning paths.
+- **Phase 1.5:** `task --list` shows 11 tasks. `task lint` passes clean. `task sync:dry` parses 4 issues. `agent-listener.ps1` creates `feature/issue-N` branches, commits `feat(#N)`, creates PRs with agent self-review, moves issues to Review lane. `pr-checks.yml` triggers on PR.
+- **Phase 2:** `terraform apply` succeeds cleanly. Search Service connected via Entra ID. Zero hardcoded secrets.
+- **Phase 3:** ACA URL returns valid response. Trivy scans pass. Managed Identity acts as Sentinel.

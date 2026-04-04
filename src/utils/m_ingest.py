@@ -1,6 +1,8 @@
 import hashlib
+from typing import Any
+
 from src.utils.m_log import f_log
-from typing import Dict, Any, List
+
 
 class IngestionPipeline:
     """
@@ -15,7 +17,7 @@ class IngestionPipeline:
         """
         Implementation of H(x) = SHA256(Content_{raw} + Metadata_{source})
         """
-        hash_input = f"{content}_{source_metadata}".encode('utf-8')
+        hash_input = f"{content}_{source_metadata}".encode()
         return hashlib.sha256(hash_input).hexdigest()
 
     def check_idempotency(self, doc_id: str, current_hash: str) -> bool:
@@ -44,5 +46,6 @@ class IngestionPipeline:
         Main loop for Phase 1: local ingestion.
         """
         f_log(f"Starting ingestion run from {docs_directory}", c_type="process")
-        # In reality, this would os.walk the directory, load files, chunk them, and use self.search_client.upload_documents
+        # In reality, this would os.walk the directory, load files,
+        # chunk them, and use self.search_client.upload_documents
         pass

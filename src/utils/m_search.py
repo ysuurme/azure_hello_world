@@ -1,7 +1,9 @@
-from src.utils.m_log import f_log
-from typing import List, Dict, Any
+from typing import Any
 
-def knowledge_base_retrieve(query: str, search_client: Any) -> List[Dict[str, Any]]:
+from src.utils.m_log import f_log
+
+
+def knowledge_base_retrieve(query: str, search_client: Any) -> list[dict[str, Any]]:
     """
     Simulates Context-Aware Search across Azure AI Search using Hybrid Vector + BM25 scoring.
     """

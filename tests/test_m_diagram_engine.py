@@ -1,6 +1,7 @@
-import pytest
-from unittest.mock import patch, mock_open
+from unittest.mock import mock_open, patch
+
 from src.utils.m_diagram_engine import DiagramEngine
+
 
 @patch('src.utils.m_diagram_engine.subprocess.run')
 @patch('builtins.open', new_callable=mock_open, read_data=b'<svg>Mock Architecture</svg>')

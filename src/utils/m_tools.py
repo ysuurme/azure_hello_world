@@ -1,6 +1,9 @@
+from typing import Any
+
 import requests
-from typing import List, Dict, Any
+
 from src.utils.m_log import f_log
+
 
 def _get_fallback_static_price(resource: str) -> float | str:
     """Helper to return fallback prices."""
@@ -24,7 +27,7 @@ def fetch_retail_price(resource: str) -> float | str:
         f_log(f"Cost API failure for {resource}: {e}", c_type="error")
         return "Error retrieving live price"
 
-def calculate_cost(resources: List[str]) -> Dict[str, Any]:
+def calculate_cost(resources: list[str]) -> dict[str, Any]:
     """
     Queries the live Azure Retail Prices API to establish estimated costs.
     Moves the agent from Searchbot to Financial Architect.

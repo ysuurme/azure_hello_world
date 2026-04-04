@@ -108,36 +108,53 @@ AI Agents operating in this workspace act as the "Senior Educational Software Ar
 
 ---
 
-## 🤖 Agentic Development (GitHub Issues)
+## 🤖 Agentic Development (GitHub Issues → PR)
 
-This project supports a headless "Director Workflow" where development tasks are triggered remotely via GitHub Issues and executed by a local agent listener.
+Development tasks execute through a headless "Director Workflow" — create an issue from your phone, and a local agent listener builds, tests, and delivers a PR for your review.
 
-### The Director Workflow (Mobile Mode)
+### Full Validated Workflow
 
 ```
-Detect → Task → Monitor → Approve
+📱 Phone: Create issue + label 'agent:dev'
+    │
+    ▼
+🤖 Listener picks up issue → label: agent:in-progress
+    │
+    ├─ Phase A: Refine
+    │   Read raw issue → formalize into Goal/Description/Requirements/AC
+    │   Post refinement comment on issue
+    │
+    ├─ Phase B: Develop
+    │   git checkout main → git pull → git checkout -b feature/issue-N
+    │   Gemini CLI reads issue, follows GEMINI.md + .agents/skills/
+    │   Implements changes → runs task test && task lint
+    │
+    ├─ Commit & PR
+    │   git commit -m "feat(#N): Title" → git push origin HEAD
+    │   gh pr create --reviewer ysuurme --project @hello_architect
+    │   PR body: summary, validation status, Closes #N
+    │
+    ├─ Agent Self-Review
+    │   gh pr review --comment (diff stats + quality checklist)
+    │   All agent notes posted on PR for full transparency
+    │
+    └─ Handoff
+        Label: agent:review → issue moves to Review lane
+        GitHub Action pr-checks.yml runs lint + test (Critic)
+        │
+        ▼
+📱 Phone: Review PR → Approve → Merge → Branch auto-deleted
 ```
-
-1. **Detect**: You spot a bug or feature idea while away from your desk.
-2. **Task**: Open the GitHub App → Create Issue → Apply the `agent:dev` label.
-3. **Monitor**: Watch label transitions and agent comments from the GitHub App. The PR Checks Action (`pr-checks.yml`) provides test/lint results in the Actions tab.
-4. **Approve**: Receive a PR notification → Review → Merge.
 
 ### Label Lifecycle
 
 | Label | Meaning |
 |-------|---------|
-| `agent:dev` | Issue is queued for agent pickup |
-| `agent:in-progress` | Agent has claimed and is working on the issue |
-| `agent:completed` | Agent finished successfully, PR created |
-| `agent:failed` | Agent encountered an error (see issue comments for details) |
-
-### Two-Phase Agent Loop
-
-The agent listener (`.github/scripts/agent-listener.ps1`) implements a deliberate two-phase process:
-
-- **Phase A — Refine**: Reads the raw issue body and enriches it into a structured format (Goal / Description / Requirements / Acceptance Criteria). This means you can write rough issues from your phone — the agent formalizes them before coding.
-- **Phase B — Develop**: Creates a linked branch via `gh issue develop`, executes the development task, and creates a PR on success.
+| `agent:dev` | Queued for agent pickup |
+| `agent:in-progress` | Agent is working (refine + develop) |
+| `agent:review` | PR created, agent review posted, awaiting human approval |
+| `agent:completed` | Human approved and merged |
+| `agent:failed` | Agent error (see issue comments) |
 
 ### Running the Listener
 
@@ -145,7 +162,15 @@ The agent listener (`.github/scripts/agent-listener.ps1`) implements a deliberat
 task agent:listen
 ```
 
-> **⚠️ Temporary Architecture**: The listener currently runs on your laptop. If the laptop sleeps or loses network, tasks are silently dropped. The future target is GitHub Codespaces with event-driven spin-up/down. This is explicitly accepted as a Phase 1 scaffold.
+> **⚠️ Temporary Architecture**: Laptop-based polling listener. If laptop sleeps, tasks are silently dropped. Future target: event-driven GitHub Codespaces.
+
+### Key Design Decisions
+
+- **Gemini CLI** is the Builder (writes code). **GitHub Actions** is the Critic (validates PRs). `gh` CLI handles plumbing (branches, labels, PRs).
+- **Branch naming**: `feature/issue-N` — consistent, grep-friendly, auto-cleaned on merge.
+- **Commit format**: `feat(#N): Title` — conventional commits, machine-parseable.
+- **Agent reviews its own PR** with diff stats and a checklist. Human approval is always required.
+- **`@hello_architect` project** receives all PRs. Issues move to the Review lane automatically.
 
 ---
 
@@ -153,8 +178,10 @@ task agent:listen
 
 | File | Role |
 |------|------|
-| `GEMINI.md` | **Thin structural map** — repository layout, rules, and cross-references. Consumed automatically by Gemini CLI and VS Code extension. |
-| `agents.md` | **Deep architecture** — design philosophy, learning goals, architectural context, session operating instructions. |
-| `.agents/skills/` | **Coding enforcement** — deterministic behavioral protocols for AI agents. |
-| `Taskfile.yml` | **Single source of truth** for all automation commands. Run `task --list` to discover available tasks. |
+| `GEMINI.md` | Thin structural map — repository layout, rules. Auto-consumed by Gemini CLI. |
+| `agents.md` | Deep architecture — design philosophy, learning goals, session instructions. |
+| `.agents/skills/` | Coding enforcement protocols (`review-code`, `design-architecture`, `design-infrastructure`, `git-workflow`). |
+| `Taskfile.yml` | Single source of truth for all commands. `task --list` to discover. |
+| `ISSUES.md` | Agile issue manifest. `task sync` pushes to GitHub. |
+
 

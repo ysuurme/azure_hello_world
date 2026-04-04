@@ -1,20 +1,17 @@
-import os
-import json
-from unittest import mock
 
 import pytest
 
-from src.utils.m_ai_client import ClientManager
 from src.agents.architecture_composer import ArchitectureComposerAgent
 from src.agents.intake_reviewer import IntakeReviewerAgent
 from src.utils.m_ai_client import ClientManager
+
 
 # Helper mock for AIProjectClient
 class MockAIProjectClient:
     def __init__(self, *args, **kwargs):
         pass
 
-    class inference:
+    class Inference:
         @staticmethod
         def get_chat_completions(*, model, messages):
             # Return a simple mock response structure
@@ -81,39 +78,57 @@ def test_architecture_composer_fallback(monkeypatch):
     assert "## a. Purpose" in result
 
 
+def _build_mock_openai_cm(output_text: str):
+    """Build a mock context manager mimicking ClientManager.get_openai_client()."""
+    class MockResponse:
+        pass
+    MockResponse.output_text = output_text
+
+    class MockResponses:
+        def create(self, model, input):
+            return MockResponse()
+
+    class MockClient:
+        def __init__(self):
+            self.responses = MockResponses()
+
+    class MockCM:
+        def __enter__(self):
+            return MockClient()
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    return MockCM()
+
+
 def test_intake_reviewer_fallback(monkeypatch):
     """When a chat client is available the intake reviewer should parse chat responses."""
-    # Mock chat responses for short and long prompts
-    def make_chat_with(content):
-        class MockChat:
-            def complete(self, *args, **kwargs):
-                class Choice:
-                    class Message:
-                        pass
-                    message = Message()
-                class Resp:
-                    pass
-                mock_choice = Choice()
-                mock_choice.message.content = content
-                resp = Resp()
-                resp.choices = [mock_choice]
-                return resp
-        return MockChat()
-
-    short_json = '{"status": "needs_clarification", "questions": ["Please provide more details on workload."]}'
+    short_json = (
+        '{"status": "needs_clarification", '
+        '"questions": ["Please provide more details on workload."]}'
+    )
     long_json = '{"status": "ready", "requirements": {"objective": "Demo"}}'
 
     # First test short prompt
-    monkeypatch.setattr("src.utils.m_ai_client.ClientManager.get_openai_client", lambda self: type("CM", (), {"__enter__": lambda s: type("O", (), {"responses": type("R", (), {"create": lambda self, model, input: type("Resp", (), {"output_text": short_json})()})()}), "__exit__": lambda s, a, b, c: False})())
+    monkeypatch.setattr(
+        "src.utils.m_ai_client.ClientManager.get_openai_client",
+        lambda self: _build_mock_openai_cm(short_json),
+    )
     reviewer = IntakeReviewerAgent(client_manager=ClientManager())
     short_prompt = "short"
     result = reviewer.review_input(short_prompt)
     assert result["status"] == "needs_clarification"
 
     # Then test long prompt
-    monkeypatch.setattr("src.utils.m_ai_client.ClientManager.get_openai_client", lambda self: type("CM", (), {"__enter__": lambda s: type("O", (), {"responses": type("R", (), {"create": lambda self, model, input: type("Resp", (), {"output_text": long_json})()})()}), "__exit__": lambda s, a, b, c: False})())
+    monkeypatch.setattr(
+        "src.utils.m_ai_client.ClientManager.get_openai_client",
+        lambda self: _build_mock_openai_cm(long_json),
+    )
     reviewer = IntakeReviewerAgent(client_manager=ClientManager())
-    long_prompt = "This is a sufficiently long prompt describing the workload and constraints"
+    long_prompt = (
+        "This is a sufficiently long prompt describing "
+        "the workload and constraints"
+    )
     result = reviewer.review_input(long_prompt)
     assert result["status"] == "ready"
     assert isinstance(result.get("requirements"), dict)

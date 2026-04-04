@@ -1,8 +1,7 @@
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from src.utils.m_orchestrator import AgenticOrchestrator
-from src.agents.intake_reviewer import IntakeReviewerAgent
-from src.agents.architecture_composer import ArchitectureComposerAgent
+
 
 class TestAgenticOrchestrator:
 
@@ -12,7 +11,6 @@ class TestAgenticOrchestrator:
         """
         Ensures the Orchestrator safely instantiates its two sub-agents.
         """
-        from unittest.mock import MagicMock
         orchestrator = AgenticOrchestrator(client_manager=MagicMock())
         
         # It assigns class instances dynamically internally
@@ -34,7 +32,6 @@ class TestAgenticOrchestrator:
         mock_composer_instance = mock_composer.return_value
         mock_composer_instance.generate_architecture.return_value = "## Architecture Created"
         
-        from unittest.mock import MagicMock
         orchestrator = AgenticOrchestrator(client_manager=MagicMock())
         
         initial_state = {"phase": "INTAKE"}

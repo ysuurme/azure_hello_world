@@ -56,27 +56,37 @@ $StashResult = git stash 2>&1
 $DidStash = $StashResult -notmatch "No local changes"
 
 try {
-    # 2. Create linked branch (auto-links issue in GitHub)
-    gh issue develop $IssueNumber --checkout 2>&1
+    # 2. Create feature branch from main
+    git checkout main 2>&1 | Out-Null
+    git pull origin main 2>&1 | Out-Null
+    git checkout -b "feature/issue-$IssueNumber" 2>&1
     if ($LASTEXITCODE -ne 0) { throw "Branch creation failed" }
 
     # 3. ... make changes ...
 
-    # 4. Standardized commit
+    # 4. Descriptive commit referencing issue
     git add . 2>&1 | Out-Null
-    git commit -m "Agent completed task #$IssueNumber" 2>&1
+    git commit -m "feat(#$IssueNumber): $IssueTitle" 2>&1
     if ($LASTEXITCODE -ne 0) { throw "Commit failed" }
 
     # 5. Push current branch (name-agnostic)
     git push origin HEAD 2>&1
     if ($LASTEXITCODE -ne 0) { throw "Push failed" }
 
-    # 6. PR with auto-close reference
-    gh pr create --title "Agent: $IssueTitle" --body "Closes #$IssueNumber" 2>&1
+    # 6. PR with detailed description and auto-close reference
+    gh pr create `
+        --title "feat(#$IssueNumber): $IssueTitle" `
+        --body "Closes #$IssueNumber" `
+        --reviewer "ysuurme" `
+        --project "@hello_architect" 2>&1
     if ($LASTEXITCODE -ne 0) { throw "PR creation failed" }
+
+    # 7. Agent self-review for transparency
+    gh pr review --comment --body "Agent review notes..." 2>&1
 }
 finally {
-    # 7. Always restore stashed work
+    # 8. Return to main and restore stashed work
+    git checkout main 2>&1 | Out-Null
     if ($DidStash) { git stash pop 2>&1 | Out-Null }
 }
 ```
@@ -86,12 +96,15 @@ finally {
 | Step | Command | Why |
 |------|---------|-----|
 | Protect local work | `git stash` | Prevents dirty-tree checkout failure |
-| Create branch | `gh issue develop $N --checkout` | Auto-links branch to issue in GitHub UI |
-| Commit | `git commit -m "Agent completed task #$N"` | Machine-parseable, traceable convention |
+| Create branch | `git checkout -b feature/issue-$N` | Consistent naming, links to issue by convention |
+| Pull latest | `git checkout main && git pull` | Always branch from latest main |
+| Commit | `git commit -m "feat(#$N): $Title"` | Descriptive, machine-parseable, traceable |
 | Push | `git push origin HEAD` | Name-agnostic — works regardless of branch naming format |
-| Create PR | `gh pr create --body "Closes #$N"` | Auto-closes issue on merge |
+| Create PR | `gh pr create --reviewer "ysuurme" --project "@hello_architect"` | Routes to project, requests human review |
+| Self-review | `gh pr review --comment --body "..."` | Transparent agent notes on the PR |
 | Error guard | Check `$LASTEXITCODE -ne 0` after every command | Prevents pushing broken code |
-| Restore work | `git stash pop` in `finally` block | Always restores developer's local changes |
+| Restore work | `git checkout main && git stash pop` in `finally` block | Returns to main, restores developer's local changes |
+| Branch cleanup | Auto-deleted on merge (repo setting) | No stale branches accumulate |
 
 ## Common Mistakes
 
