@@ -69,15 +69,24 @@ if query:
                 f_log("Architecture Finalized. Triggering Pipelines.", c_type="process")
                 visualizer = DiagramEngine()
                 
-                # Mock MVP generation logic 
-                sample_d2 = "direction: right\nUI -> Orchestrator -> AI Search\nAI Search -> Capability Repo"
-                svg_bytes = visualizer.generate_svg(sample_d2)
+                # Extract D2 syntax from the LLM output
+                d2_syntax = orchestrator.get_d2_syntax(output_text)
                 
-                if svg_bytes:
-                    svg_b64 = base64.b64encode(svg_bytes).decode('utf-8')
+                if d2_syntax:
+                    f_log("D2 syntax extracted. Compiling SVG...", c_type="process")
+                    svg_bytes = visualizer.generate_svg(d2_syntax)
+                    
+                    if svg_bytes:
+                        svg_b64 = base64.b64encode(svg_bytes).decode('utf-8')
+                    else:
+                        f_log("D2 compilation returned no bytes.", c_type="warning")
+                else:
+                    f_log("No D2 syntax block found in LLM output.", c_type="warning")
                     
                 persister = ArchitecturePersister()
-                persister.archive_solution("Lean-MVP-Design", output_text, svg_bytes)
+                # Use svg_bytes if available, otherwise None
+                svg_to_persist = base64.b64decode(svg_b64) if svg_b64 else None
+                persister.archive_solution("Lean-MVP-Design", output_text, svg_to_persist)
             
             # Update local State Machine tracking parameters
             st.session_state.maf_state = updated_state

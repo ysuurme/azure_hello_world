@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any
 
 import src.utils.m_ai_client as m_ai_client
@@ -28,7 +29,9 @@ class ArchitectureComposerAgent:
             "b. Decisions that lead to the solution architecture\n"
             "c. Scenario's considered with pro's/con's for the solution architecture\n"
             "d. Rationale for selecting the solution architecture in b.\n"
-            "e. Implementation guidelines containing any relevant details"
+            "e. Implementation guidelines containing any relevant details\n\n"
+            "After the markdown, you MUST include a D2 diagram syntax block wrapped in ```d2 ... ``` "
+            "that visualizes the architecture components and their relationships."
         )
 
     def _retrieve_capabilities(self, requirements: dict[str, Any]) -> list[dict[str, str]]:
@@ -75,7 +78,8 @@ class ArchitectureComposerAgent:
             "Checker Costs. If the Monthly Cost exceeds the User Constraint "
             "budget, you MUST select an alternative 'Value' technology inside "
             "your rationale and adjust the architecture diagram output "
-            "accordingly. Draft the markdown strictly according to the format."
+            "accordingly. Draft the markdown strictly according to the format, "
+            "and ALWAYS include the ```d2 code block at the end."
         )
         
         # Call AI Foundry Responses via OpenAI surface exclusively.
@@ -92,3 +96,12 @@ class ArchitectureComposerAgent:
         except Exception as e:
             f_log(f"LLM Generation Failed: {e}", c_type="error")
             return f"Error Generating Architecture: {e}"
+
+    def generate_d2_syntax(self, markdown: str) -> str | None:
+        """
+        Extracts D2 syntax from a markdown code block.
+        """
+        match = re.search(r"```d2\n(.*?)```", markdown, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        return None
