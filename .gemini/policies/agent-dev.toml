@@ -1,0 +1,21 @@
+# .gemini/policies/agent-dev.toml
+
+[[rule]]
+description = "Allow the Builder to manage the dev environment"
+toolName = "run_shell_command"
+commandPrefix = ["gh", "task", "ruff", "git"]
+decision = "allow"
+priority = 500
+
+[[rule]]
+description = "Hard deny for destructive commands"
+toolName = "run_shell_command"
+commandPrefix = ["rm", "sudo", "format"]
+decision = "deny"
+priority = 600
+
+[[rule]]
+description = "Allow file system access"
+toolName = ["read_file", "write_file", "grep_search", "replace_file_content", "multi_replace_file_content", "list_dir"]
+decision = "allow"
+priority = 500
