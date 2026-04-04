@@ -46,9 +46,25 @@ graph TD
 ## 🚀 Native Local Deployment
 
 ### Prerequisites
-- **Python 3.10+** installed on your Windows Host.
-- **UV** package manager (`pip install uv`).
-- **Azure CLI** installed and authenticated via `az login` to a tenant holding **"Cognitive Services OpenAI User"** data-plane permissions over an active AI Foundry project.
+
+To run this application locally, you must satisfy the following environment and identity requirements:
+
+1.  **Python 3.10+** installed on your Windows Host.
+2.  **UV** package manager (`pip install uv`).
+3.  **Azure CLI** installed and authenticated via `az login`.
+4.  **Azure RBAC Role**: Your user account must have the **"Cognitive Services OpenAI User"** role assigned on the Azure AI Foundry project or its parent Resource Group.
+5.  **Environment Variables**: Create a `.env` file in the project root with:
+    - `AZURE_AAIF_PROJECT_ENDPOINT`: The endpoint for your AI Foundry project (e.g., `https://<REGION>.api.azureml.ms`).
+    - (Optional) `AZURE_AUTH_MODE`: Set to `cli` (default) for `az login` or `sp` for Service Principal.
+    - (Optional) `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_SECRET`: Required if `AZURE_AUTH_MODE=sp`.
+6.  **Model Deployments**: Ensure the following models are deployed in your AI Foundry project with names matching `config.py`:
+    - `gpt-5-mini` (Intake Reviewer)
+    - `DeepSeek-V3.1` (Architecture Composer)
+
+Verify your setup by running:
+```powershell
+task agent:check
+```
 
 ### 1. Execution (Single Command)
 Because we migrated into a Lean MVP architecture, startup is completely streamlined via UV:

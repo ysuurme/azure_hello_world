@@ -9,6 +9,11 @@ load_dotenv()
 # --- Core Paths ---
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+# --- Azure AI Foundry ---
+# The endpoint for the AI Foundry project, e.g., "https://<REGION>.api.azureml.ms"
+# This can be the raw endpoint or the full connection string.
+AZURE_AAIF_PROJECT_ENDPOINT = os.getenv("AZURE_AAIF_PROJECT_ENDPOINT")
+
 # --- AI Models ---
 # Structure allows easy reconfiguration of models cleanly per agent
 AGENT_MODELS = {
