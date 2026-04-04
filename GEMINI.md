@@ -24,7 +24,7 @@
 
 ## Git Workflow
 
-Branches: `feature/issue-N` from `main`. Commits: `feat(#N): Title`. PRs target `main` with `Closes #N`. Agent self-reviews every PR. Human approval required. Branch auto-deleted on merge. Full protocol in `.agents/skills/git-workflow/SKILL.md`.
+Branches: `feature/issue-N` from `master`. Commits: `feat(#N): Title`. PRs target `master` with `Closes #N`. Agent self-reviews every PR. Human approval required. Branch auto-deleted on merge. Full protocol in `.agents/skills/git-workflow/SKILL.md`.
 
 ## Agentic Development
 

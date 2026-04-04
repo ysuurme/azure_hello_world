@@ -103,8 +103,8 @@ function Invoke-DevelopPhase {
     
     # Create feature branch from main with consistent naming
     $BranchName = "feature/issue-$IssueNumber"
-    git checkout main 2>&1 | Out-Null
-    git pull origin main 2>&1 | Out-Null
+    git checkout master 2>&1 | Out-Null
+    git pull origin master 2>&1 | Out-Null
     
     $GitOutput = git checkout -b $BranchName 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) {
@@ -287,8 +287,8 @@ $_
             Add-IssueComment -IssueNumber $IssueNumber -Body $ErrorBody
         }
         finally {
-            # Return to main and restore stashed work
-            git checkout main 2>&1 | Out-Null
+            # Return to master and restore stashed work
+            git checkout master 2>&1 | Out-Null
             if ($DidStash) {
                 git stash pop 2>&1 | Out-Null
             }
