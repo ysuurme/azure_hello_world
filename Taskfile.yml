@@ -77,3 +77,11 @@ tasks:
     desc: "Start the local agent listener polling for 'agent:dev' labeled issues"
     cmds:
       - powershell -ExecutionPolicy Bypass -File .github/scripts/agent-listener.ps1
+
+  diagram:test:
+    desc: "Verify D2 compilation by generating a sample SVG"
+    cmds:
+      - 'powershell -ExecutionPolicy Bypass -Command "Set-Content -Path test_diagram.d2 -Value ''direction: right; User -> Agent''"'
+      - 'd2 test_diagram.d2 test_diagram.svg'
+      - 'powershell -ExecutionPolicy Bypass -Command "if (Test-Path test_diagram.svg) { Write-Host ''SVG generated successfully'' } else { throw ''SVG generation failed'' }"'
+      - 'powershell -ExecutionPolicy Bypass -Command "Remove-Item test_diagram.d2, test_diagram.svg"'

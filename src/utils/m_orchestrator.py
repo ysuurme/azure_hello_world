@@ -46,3 +46,9 @@ class AgenticOrchestrator:
             
         f_log("Unhandled MAF State.", c_type="error")
         return session_state, "Unknown state occurred in Orchestrator."
+
+    def get_d2_syntax(self, markdown: str) -> str | None:
+        """
+        Delegates D2 extraction to the composer agent.
+        """
+        return self.composer.generate_d2_syntax(markdown)
