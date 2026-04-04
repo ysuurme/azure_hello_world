@@ -69,6 +69,7 @@ tasks:
         Validate by running: task test && task lint.
         If validation fails, fix the issues and re-validate.
         Do NOT create git commits or branches — the listener handles git operations.
+        IMPORTANT: Keep the user updated! Every few operations or upon completing a milestone, you MUST use run_shell_command to execute `gh issue comment {{.ISSUE}} --body "..."` to post a brief, bulleted progress report.
         When done, output a summary of changes made."
         --policy ./.gemini/policies/agent-dev.toml
 
