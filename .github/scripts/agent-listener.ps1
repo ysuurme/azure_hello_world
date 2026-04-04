@@ -105,9 +105,15 @@ function Invoke-DevelopPhase {
     $BranchName = "feature/issue-$IssueNumber"
     git checkout main 2>&1 | Out-Null
     git pull origin main 2>&1 | Out-Null
-    git checkout -b $BranchName 2>&1
+    
+    $GitOutput = git checkout -b $BranchName 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) {
-        throw "Failed to create branch $BranchName for issue #$IssueNumber"
+        if ($GitOutput -match "already exists") {
+            Write-Log "Branch $BranchName already exists. Switching to it." -Color Yellow
+            git checkout $BranchName 2>&1 | Out-Null
+        } else {
+            throw "Failed to create branch $BranchName for issue #$IssueNumber.`nGit Output: $GitOutput"
+        }
     }
 
     Add-IssueComment -IssueNumber $IssueNumber -Body "🌿 Branch ``$BranchName`` created. Running Gemini CLI builder..."
@@ -268,7 +274,17 @@ while ($true) {
         catch {
             Write-Log "❌ Error on issue #${IssueNumber}: $_" -Color Red
             Update-IssueLabels -IssueNumber $IssueNumber -RemoveLabel "agent:in-progress" -AddLabel "agent:failed"
-            Add-IssueComment -IssueNumber $IssueNumber -Body "❌ Agent failed: ``$_``"
+            
+            $ErrorBody = @"
+❌ **Agent pipeline failed**
+
+``````text
+$_
+``````
+
+*Please resolve the underlying error and apply the `agent:dev` label again to retry.*
+"@
+            Add-IssueComment -IssueNumber $IssueNumber -Body $ErrorBody
         }
         finally {
             # Return to main and restore stashed work
