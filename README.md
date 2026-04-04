@@ -105,3 +105,56 @@ AI Agents operating in this workspace act as the "Senior Educational Software Ar
 1. **`design-architecture`**: Dictates component Single Responsibility and State routing logic. Enforces "Standard Library First".
 2. **`design-infrastructure`**: Controls strict blast-radius isolation (Entra ID, Docker rootless constraints, Azure Networking limits).
 3. **`review-code`**: Manages explicit code limits (`<30`-line function ceilings, 2-level indent limits, mandatory Type Hinting, & Guard Clauses).
+
+---
+
+## 🤖 Agentic Development (GitHub Issues)
+
+This project supports a headless "Director Workflow" where development tasks are triggered remotely via GitHub Issues and executed by a local agent listener.
+
+### The Director Workflow (Mobile Mode)
+
+```
+Detect → Task → Monitor → Approve
+```
+
+1. **Detect**: You spot a bug or feature idea while away from your desk.
+2. **Task**: Open the GitHub App → Create Issue → Apply the `agent:dev` label.
+3. **Monitor**: Watch label transitions and agent comments from the GitHub App. The PR Checks Action (`pr-checks.yml`) provides test/lint results in the Actions tab.
+4. **Approve**: Receive a PR notification → Review → Merge.
+
+### Label Lifecycle
+
+| Label | Meaning |
+|-------|---------|
+| `agent:dev` | Issue is queued for agent pickup |
+| `agent:in-progress` | Agent has claimed and is working on the issue |
+| `agent:completed` | Agent finished successfully, PR created |
+| `agent:failed` | Agent encountered an error (see issue comments for details) |
+
+### Two-Phase Agent Loop
+
+The agent listener (`.github/scripts/agent-listener.ps1`) implements a deliberate two-phase process:
+
+- **Phase A — Refine**: Reads the raw issue body and enriches it into a structured format (Goal / Description / Requirements / Acceptance Criteria). This means you can write rough issues from your phone — the agent formalizes them before coding.
+- **Phase B — Develop**: Creates a linked branch via `gh issue develop`, executes the development task, and creates a PR on success.
+
+### Running the Listener
+
+```powershell
+task agent:listen
+```
+
+> **⚠️ Temporary Architecture**: The listener currently runs on your laptop. If the laptop sleeps or loses network, tasks are silently dropped. The future target is GitHub Codespaces with event-driven spin-up/down. This is explicitly accepted as a Phase 1 scaffold.
+
+---
+
+## 📚 Project Governance
+
+| File | Role |
+|------|------|
+| `GEMINI.md` | **Thin structural map** — repository layout, rules, and cross-references. Consumed automatically by Gemini CLI and VS Code extension. |
+| `agents.md` | **Deep architecture** — design philosophy, learning goals, architectural context, session operating instructions. |
+| `.agents/skills/` | **Coding enforcement** — deterministic behavioral protocols for AI agents. |
+| `Taskfile.yml` | **Single source of truth** for all automation commands. Run `task --list` to discover available tasks. |
+

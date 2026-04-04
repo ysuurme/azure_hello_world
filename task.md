@@ -25,6 +25,18 @@
 - [x] Rewrite `README.md` (Agentic `.agents/skills` framework integration)
 - [x] Update `implementation_plan.md` to guarantee structural reproducibility.
 
+## Phase 1.5: Headless Agentic Ecosystem — Completed
+- [x] Create `GEMINI.md` (thin structural map for Gemini CLI)
+- [x] Add `ruff` via `uv add --dev ruff` + config
+- [x] Create `sync-issues.ps1` (parameterized, replaces `sync-todo.ps1`)
+- [x] Create `ISSUES.md` with seed issues
+- [x] Expand `Taskfile.yml` (dev, test, lint, docker, sync, agent tasks)
+- [x] Create `agent-listener.ps1` (two-phase Refine → Develop)
+- [x] Delete `.agents/workflows/` (Taskfile subsumes)
+- [x] Delete `sync-todo.ps1` (replaced by `sync-issues.ps1`)
+- [x] Update `README.md` with agentic development + governance sections
+- [x] Create `.github/workflows/pr-checks.yml` (MVP CI)
+
 ## Phase 2: Infrastructure Provisioning
 - [ ] `infra/main.tf` — AI Search, Capability Host, AI Foundry (Entra ID)
 - [ ] Enforce **Azure Blob Storage** as the locked Terraform remote backend.

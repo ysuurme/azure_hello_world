@@ -32,6 +32,26 @@ To successfully reproduce and extend this architecture, developers or AI Agents 
 
 ---
 
+### Phase 1.5: Headless Agentic Ecosystem
+*Status: Completed. Focus: GitHub-driven development loop, automation scaffolding, governance.*
+
+#### Project Governance Model (Implemented)
+- `GEMINI.md`: Thin structural map for Gemini CLI (repository layout, rules, cross-references).
+- `agents.md`: Deep architectural context (design philosophy, learning goals, session instructions).
+- `Taskfile.yml`: Single source of truth for all automation commands (`task --list`).
+
+#### Automation Infrastructure (Implemented)
+- `Taskfile.yml`: Expanded with `dev`, `test`, `lint`, `lint:fix`, `docker:build`, `docker:down`, `sync`, `sync:dry`, `agent:dev`, `agent:listen` tasks. Parameterized `GITHUB_PROJECT` variable for cross-repo reuse.
+- `.github/scripts/sync-issues.ps1`: Parses `ISSUES.md` into GitHub Issues (parameterized project name, replaces `sync-todo.ps1`).
+- `.github/scripts/agent-listener.ps1`: Two-phase local listener (Refine → Develop) with error recovery. **Temporary architecture** — future target is GitHub Codespaces.
+- `.github/workflows/pr-checks.yml`: MVP CI running `ruff check` + `pytest` on every PR to `main`.
+- `ISSUES.md`: Agile issue tracking manifest using `ISSUE:…END_ISSUE` block format.
+
+#### Code Quality (Implemented)
+- `ruff` added as dev dependency via `uv add --dev ruff`. Configured in `pyproject.toml` with `E, F, I, N, UP` rule sets.
+
+---
+
 ### Phase 2: Infrastructure Provisioning 
 *Status: Pending. Focus: Security, Network mapping, and Terraform Blueprints.*
 
@@ -67,5 +87,6 @@ To successfully reproduce and extend this architecture, developers or AI Agents 
 
 Because this is an evolving architecture, validation is codified in the deployment layers:
 - **Phase 1 Validation:** Local tests confirm the agent's MCP tools calculate costs correctly and `m_log` records semantic reasoning paths.
+- **Phase 1.5 Validation:** `task --list` displays all tasks. `task sync:dry` parses `ISSUES.md` correctly. `pr-checks.yml` triggers on PR. Agent listener handles label lifecycle (visible from mobile).
 - **Phase 2 Validation:** `terraform apply` succeeds cleanly; the Foundry project is connected to the Search Index via Entra ID without hardcoded secrets.
 - **Phase 3 Validation:** ACA URL returns a valid response asserting the Managed Identity natively acts as the Sentinel. Trivy container scans pass successfully.

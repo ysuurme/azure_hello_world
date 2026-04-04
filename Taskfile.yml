@@ -1,0 +1,62 @@
+version: '3'
+
+vars:
+  GITHUB_PROJECT: "@hello_architect"
+
+tasks:
+  dev:
+    desc: "Start local development (Streamlit UI on port 8501)"
+    cmds:
+      - uv sync --frozen
+      - uv run streamlit run src/ui/app.py --server.port 8501
+
+  test:
+    desc: "Run the full test suite"
+    cmds:
+      - uv run pytest tests/ -v
+
+  lint:
+    desc: "Run ruff static analysis on src/ and tests/"
+    cmds:
+      - uv run ruff check src/ tests/
+
+  lint:fix:
+    desc: "Auto-fix ruff lint violations"
+    cmds:
+      - uv run ruff check src/ tests/ --fix
+
+  docker:build:
+    desc: "Build and run the Docker container via docker-compose"
+    cmds:
+      - docker compose -f docker-compose.dev.yml up --build
+
+  docker:down:
+    desc: "Stop the Docker container"
+    cmds:
+      - docker compose -f docker-compose.dev.yml down
+
+  sync:
+    desc: "Parse ISSUES.md and create GitHub Issues in the project"
+    cmds:
+      - powershell -ExecutionPolicy Bypass -File .github/scripts/sync-issues.ps1 -ProjectName "{{.GITHUB_PROJECT}}"
+
+  sync:dry:
+    desc: "Dry run of issue sync — validates parsing without creating issues"
+    cmds:
+      - powershell -ExecutionPolicy Bypass -File .github/scripts/sync-issues.ps1 -DryRun -ProjectName "{{.GITHUB_PROJECT}}"
+
+  status:
+    desc: "Validate GitHub CLI and SSH environment"
+    cmds:
+      - gh auth status
+      - ssh -T git@github.com || true
+
+  agent:dev:
+    desc: "Agent-driven development task (called by agent-listener with ISSUE= variable)"
+    cmds:
+      - echo "Agent development task for issue #{{.ISSUE}} — placeholder for Gemini CLI integration"
+
+  agent:listen:
+    desc: "Start the local agent listener polling for 'agent:dev' labeled issues"
+    cmds:
+      - pwsh .github/scripts/agent-listener.ps1
