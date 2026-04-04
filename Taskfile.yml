@@ -51,6 +51,11 @@ tasks:
       - gh auth status
       - ssh -T git@github.com || true
 
+  agent:check:
+    desc: "Run the AI Foundry health check (validates endpoint, models, and inference)"
+    cmds:
+      - uv run python -m src.utils.m_health_check
+
   agent:dev:
     desc: "Agent-driven development — reads issue, implements, validates via Gemini CLI"
     cmds:
