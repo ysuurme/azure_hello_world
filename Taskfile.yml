@@ -83,6 +83,14 @@ tasks:
     cmds:
       - powershell -ExecutionPolicy Bypass -File .github/scripts/agent-listener.ps1
 
+  agent:listen:debug:
+    desc: "Start the listener without forcefully unloading/reloading LM Studio models"
+    deps: [status]
+    env:
+      KEEP_MODELS_LOADED: "true"
+    cmds:
+      - powershell -ExecutionPolicy Bypass -File .github/scripts/agent-listener.ps1
+
   agent:local:
     internal: true
     desc: "Start the MCP Bridge (lm-local) in a separate terminal for the Coding Specialist role"

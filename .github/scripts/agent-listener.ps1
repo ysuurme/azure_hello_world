@@ -274,17 +274,21 @@ function Invoke-EnvironmentBootstrap {
 
     Write-Log "  Starting LMS server..." -Color Gray
     lms server start 2>&1 | Out-Null
-    Write-Log "  Clearing VRAM safely..." -Color Gray
-    lms unload --all 2>&1 | Out-Null
-    
-    Write-Log "  Loading explicit model ($LocalAiModel) with 32768 context..." -Color Gray
-    $Payload = @{
-        model = $LocalAiModel
-        context_length = 32768
-        flash_attention = $true
-        echo_load_config = $true
-    } | ConvertTo-Json -Depth 10 -Compress
-    Invoke-RestMethod -Uri "http://localhost:1234/api/v1/models/load" -Method Post -Body $Payload -ContentType "application/json" | Out-Null
+    if ($env:KEEP_MODELS_LOADED -eq 'true') {
+        Write-Log "  [Debug Mode] Skipping LMS VRAM clear..." -Color Yellow
+    } else {
+        Write-Log "  Clearing VRAM safely..." -Color Gray
+        lms unload --all 2>&1 | Out-Null
+        
+        Write-Log "  Loading explicit model ($LocalAiModel) with 32768 context..." -Color Gray
+        $Payload = @{
+            model = $LocalAiModel
+            context_length = 32768
+            flash_attention = $true
+            echo_load_config = $true
+        } | ConvertTo-Json -Depth 10 -Compress
+        Invoke-RestMethod -Uri "http://localhost:1234/api/v1/models/load" -Method Post -Body $Payload -ContentType "application/json" | Out-Null
+    }
 
     Write-Log "  Generating settings.json dynamically for Bridge..." -Color Gray
     $settingsPath = "$PSScriptRoot\..\..\.gemini\settings.json"
@@ -304,11 +308,17 @@ function Invoke-EnvironmentBootstrap {
         }
     }
 
+    # Resolve bridge entry point: use node.exe directly to avoid Windows .cmd spawn pipe issues
+    $BridgeEntryPoint = $null
     if ($McpValid) {
-        Write-Log "  Validating MCP Bridge Binary Resolution..." -Color Gray
-        npx.cmd -y @intelligentinternet/gemini-cli-mcp-openai-bridge --help 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Log "⚠️ Validation Failed: npx.cmd failed to execute the MCP bridge. Verify Node.js is active. Continuing without MCP." -Color Yellow
+        Write-Log "  Resolving MCP Bridge entry point..." -Color Gray
+        $NpmGlobalRoot = (npm root -g 2>$null).Trim()
+        $CandidatePath = Join-Path $NpmGlobalRoot "@intelligentinternet\gemini-cli-mcp-openai-bridge\dist\index.js"
+        if (Test-Path $CandidatePath) {
+            $BridgeEntryPoint = $CandidatePath
+            Write-Log "  Bridge resolved: $BridgeEntryPoint" -Color Gray
+        } else {
+            Write-Log "⚠️ Validation Failed: Cannot resolve MCP bridge JS entry point at $CandidatePath. Continuing without MCP." -Color Yellow
             $McpValid = $false
         }
     }
@@ -318,13 +328,10 @@ function Invoke-EnvironmentBootstrap {
     if (-not $jsonPayload.mcpServers) { $jsonPayload | Add-Member -Type NoteProperty -Name mcpServers -Value [PSCustomObject]@{} }
     
     if ($McpValid) {
+        # Use node.exe directly — bypasses Windows .cmd batch IPC pipe closure bug
         $jsonPayload.mcpServers | Add-Member -MemberType NoteProperty -Name "lm-local" -Value @{
-            command = "npx.cmd"
-            args = @("--yes", "--quiet", "@intelligentinternet/gemini-cli-mcp-openai-bridge", "--url", "http://localhost:1234/v1", "--model", $LocalAiModel, "--mode", "edit", "--i-know-what-i-am-doing", "--target-dir", ".")
-            env = @{
-                LOG_LEVEL = "error"
-                GEMINI_API_KEY = "local-bridge-bypass"
-            }
+            command = "node"
+            args = @($BridgeEntryPoint, "--url", "http://localhost:1234/v1", "--model", $LocalAiModel, "--mode", "edit", "--i-know-what-i-am-doing", "--target-dir", ".")
         } -Force
         Write-Log "✅ Local Model Ready & MCP Bridge Validated." -Color Green
     } else {
@@ -341,9 +348,13 @@ function Invoke-EnvironmentBootstrap {
 }
 
 function Invoke-EnvironmentTeardown {
-    Write-Log "🧹 Tearing down Local AI Environment (Clearing VRAM & Stopping Server)..." -Color Yellow
-    $null = lms unload --all
-    $null = lms server stop
+    if ($env:KEEP_MODELS_LOADED -eq 'true') {
+        Write-Log "🧹 Tearing down Local AI Environment (Keeping VRAM models Active for Debugging)..." -Color Yellow
+    } else {
+        Write-Log "🧹 Tearing down Local AI Environment (Clearing VRAM & Stopping Server)..." -Color Yellow
+        $null = lms unload --all
+        $null = lms server stop
+    }
 }
 
 # ── Main Loop ──
