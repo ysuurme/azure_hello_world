@@ -308,18 +308,56 @@ function Invoke-EnvironmentBootstrap {
         }
     }
 
-    # Resolve bridge entry point: use node.exe directly to avoid Windows .cmd spawn pipe issues
-    $BridgeEntryPoint = $null
+    # Validate inference with a hello world call
+    if ($McpValid) {
+        Write-Log "  Validating inference with hello world call..." -Color Gray
+        try {
+            $InferPayload = @{
+                model = $LocalAiModel
+                messages = @(@{ role = "user"; content = "Respond with only: hello world" })
+                max_tokens = 20
+            } | ConvertTo-Json -Depth 10 -Compress
+            $InferResult = Invoke-RestMethod -Uri "http://localhost:1234/v1/chat/completions" -Method Post -Body $InferPayload -ContentType "application/json" -TimeoutSec 30
+            $Reply = $InferResult.choices[0].message.content.Trim()
+            Write-Log "  Inference OK: '$Reply'" -Color Gray
+        }
+        catch {
+            Write-Log "⚠️ Validation Failed: Inference call failed — $_. Continuing without MCP." -Color Yellow
+            $McpValid = $false
+        }
+    }
+
+    # Start bridge as HTTP server on port 3100 — avoids Windows stdio spawn pipe bugs
+    $BridgePort = 3100
     if ($McpValid) {
         Write-Log "  Resolving MCP Bridge entry point..." -Color Gray
         $NpmGlobalRoot = (npm root -g 2>$null).Trim()
         $CandidatePath = Join-Path $NpmGlobalRoot "@intelligentinternet\gemini-cli-mcp-openai-bridge\dist\index.js"
-        if (Test-Path $CandidatePath) {
-            $BridgeEntryPoint = $CandidatePath
-            Write-Log "  Bridge resolved: $BridgeEntryPoint" -Color Gray
-        } else {
-            Write-Log "⚠️ Validation Failed: Cannot resolve MCP bridge JS entry point at $CandidatePath. Continuing without MCP." -Color Yellow
+        if (-not (Test-Path $CandidatePath)) {
+            Write-Log "⚠️ Validation Failed: Cannot resolve MCP bridge at $CandidatePath. Continuing without MCP." -Color Yellow
             $McpValid = $false
+        }
+    }
+
+    if ($McpValid) {
+        Write-Log "  Starting MCP Bridge HTTP server on port $BridgePort..." -Color Gray
+        $BridgeArgs = @(
+            $CandidatePath,
+            "--url", "http://localhost:1234/v1",
+            "--model", $LocalAiModel,
+            "--mode", "edit",
+            "--i-know-what-i-am-doing",
+            "--target-dir", ".",
+            "--port", "$BridgePort"
+        )
+        $script:BridgeProcess = Start-Process node -ArgumentList $BridgeArgs -PassThru -NoNewWindow -RedirectStandardOutput "$env:TEMP\mcp_bridge_stdout.log" -RedirectStandardError "$env:TEMP\mcp_bridge_stderr.log"
+        Start-Sleep -Seconds 3
+
+        if ($script:BridgeProcess.HasExited) {
+            Write-Log "⚠️ Validation Failed: MCP Bridge exited immediately (code $($script:BridgeProcess.ExitCode)). Continuing without MCP." -Color Yellow
+            $McpValid = $false
+        } else {
+            Write-Log "  Bridge running (PID: $($script:BridgeProcess.Id)) on http://localhost:$BridgePort" -Color Gray
         }
     }
 
@@ -328,14 +366,13 @@ function Invoke-EnvironmentBootstrap {
     if (-not $jsonPayload.mcpServers) { $jsonPayload | Add-Member -Type NoteProperty -Name mcpServers -Value [PSCustomObject]@{} }
     
     if ($McpValid) {
-        # Use node.exe directly — bypasses Windows .cmd batch IPC pipe closure bug
+        # Use SSE URL transport — avoids Windows stdio spawn pipe issues entirely
         $jsonPayload.mcpServers | Add-Member -MemberType NoteProperty -Name "lm-local" -Value @{
-            command = "node"
-            args = @($BridgeEntryPoint, "--url", "http://localhost:1234/v1", "--model", $LocalAiModel, "--mode", "edit", "--i-know-what-i-am-doing", "--target-dir", ".")
+            url = "http://localhost:$BridgePort/mcp"
         } -Force
-        Write-Log "✅ Local Model Ready & MCP Bridge Validated." -Color Green
+        Write-Log "✅ Local Model Ready & MCP Bridge Validated (SSE on port $BridgePort)." -Color Green
     } else {
-        # Strip the local capability to prevent crashing the agent build process
+        # Strip the local MCP to prevent crashing the agent build process
         if ($jsonPayload.mcpServers.PSObject.Properties.Name -contains "lm-local") {
             $jsonPayload.mcpServers.PSObject.Properties.Remove("lm-local")
         }
@@ -348,6 +385,12 @@ function Invoke-EnvironmentBootstrap {
 }
 
 function Invoke-EnvironmentTeardown {
+    # Stop bridge HTTP server if running
+    if ($script:BridgeProcess -and -not $script:BridgeProcess.HasExited) {
+        Write-Log "  Stopping MCP Bridge (PID: $($script:BridgeProcess.Id))..." -Color Gray
+        Stop-Process -Id $script:BridgeProcess.Id -Force -ErrorAction SilentlyContinue
+    }
+
     if ($env:KEEP_MODELS_LOADED -eq 'true') {
         Write-Log "🧹 Tearing down Local AI Environment (Keeping VRAM models Active for Debugging)..." -Color Yellow
     } else {

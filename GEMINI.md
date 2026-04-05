@@ -46,19 +46,43 @@ The `agent-listener.ps1` polls for `agent:dev`-labeled issues. Phase A refines r
 - **Allowed Binaries:** `gh`, `task`, `ruff`, `git`.
 - **Constraint:** Do not use raw `pip`, `npm`, or `rm -rf`; always use the project `task` runner or native operations to ensure state protection.
 
-## Model Delegation & Handoff Rules
+## Model Delegation & Handoff Rules (MANDATORY)
 
 ### Role Definitions
-- **Thinking Engine (Cloud):** Use the primary Gemini models (ex. 3.1 Pro) for high-level architecture, planning, and logic reasoning.
-- **Coding Specialist (Local):** Use the `lm-local` MCP server for all code generation, refactoring, and file writing.
+- **Cloud Model (Gemini Pro):** Architecture, planning, complex reasoning, multi-step decision-making, code review analysis.
+- **Local Model (`lm-local` MCP):** ALL code generation, file writing, file editing, refactoring, boilerplate, test scaffolding.
 
-### Default Handoff Policy
-1. For any request involving writing Python code, generating boilerplate, or refactoring existing files:
-   - **THINK:** Plan the logic using your internal cloud reasoning.
-   - **EXECUTE:** You MUST hand off the actual code-writing task to the `lm-local` tool. 
-   - **INSTRUCT:** Provide the local-model with the specific plan and context needed to write the code.
-2. If a coding task exceeds 50 lines, do not generate it yourself; use the local model's 32K context to handle it.
-3. Only use cloud generation for one-line explanations or very brief logic pseudo-code.
+### MCP-First Enforcement (Non-Negotiable)
+
+When the `lm-local` MCP server is connected and available, **default to it for all routine code-writing operations**. Cloud token budget should be reserved for reasoning and complex tasks.
+
+**Use `lm-local` MCP tools for (routine work):**
+- Creating new files with well-defined structure (Python, YAML, TOML, Markdown, JSON)
+- Single-file edits with clear, scoped changes
+- Generating test files from explicit specifications
+- Boilerplate, configuration files, and scaffolding
+- Small refactors within a single file (renames, extracts, reorders)
+
+**Use cloud model file tools for (complex work):**
+- Multi-file coordinated refactors (e.g., renaming a function across 6 files)
+- Architectural implementations requiring deep reasoning (async patterns, class hierarchies, state machines)
+- Fixing or correcting output that `lm-local` generated incorrectly
+- Security-sensitive code (auth flows, credential handling, encryption)
+- Files exceeding ~200 lines where coherence matters
+
+**Decision heuristic:** If you can describe the code change in one sentence, use `lm-local`. If the change requires multi-step reasoning or cross-file awareness, use cloud tools.
+
+### Cloud Model — Permitted Uses Only
+The cloud model may ONLY be used for:
+1. **Planning**: Deciding what to build, reading issues, analyzing requirements.
+2. **Architecture**: Designing module boundaries, data flow, API contracts.
+3. **Complex Reasoning**: Debugging multi-file interactions, resolving ambiguous requirements.
+4. **Shell Commands**: Running `gh`, `task`, `git`, `ruff` via `run_shell_command`.
+5. **Code Review**: Analyzing diffs, posting PR review comments.
+6. **Complex Code**: Multi-file refactors, security-critical implementations, or correcting `lm-local` errors.
+
+### Fallback Behavior
+If `/mcp list` shows `lm-local` as disconnected or unavailable, the cloud model may use its own file-writing tools as a fallback. Log the fallback in any progress comments posted to the issue.
 
 ## Safety & Boundaries (CRITICAL for Headless Agents)
 - **STRICT PROJECT ROOT BOUNDARY:** You must NEVER modify any files, or run any commands that affect files, outside of this project root directory.
