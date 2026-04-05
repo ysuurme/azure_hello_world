@@ -46,6 +46,20 @@ The `agent-listener.ps1` polls for `agent:dev`-labeled issues. Phase A refines r
 - **Allowed Binaries:** `gh`, `task`, `ruff`, `git`.
 - **Constraint:** Do not use raw `pip`, `npm`, or `rm -rf`; always use the project `task` runner or native operations to ensure state protection.
 
+## Model Delegation & Handoff Rules
+
+### Role Definitions
+- **Thinking Engine (Cloud):** Use the primary Gemini models (ex. 3.1 Pro) for high-level architecture, planning, and logic reasoning.
+- **Coding Specialist (Local):** Use the `lm-local` MCP server for all code generation, refactoring, and file writing.
+
+### Default Handoff Policy
+1. For any request involving writing Python code, generating boilerplate, or refactoring existing files:
+   - **THINK:** Plan the logic using your internal cloud reasoning.
+   - **EXECUTE:** You MUST hand off the actual code-writing task to the `lm-local` tool. 
+   - **INSTRUCT:** Provide the local-model with the specific plan and context needed to write the code.
+2. If a coding task exceeds 50 lines, do not generate it yourself; use the local model's 32K context to handle it.
+3. Only use cloud generation for one-line explanations or very brief logic pseudo-code.
+
 ## Safety & Boundaries (CRITICAL for Headless Agents)
 - **STRICT PROJECT ROOT BOUNDARY:** You must NEVER modify any files, or run any commands that affect files, outside of this project root directory.
 - **SYSTEM HARM:** When in doubt, do NOT run any commands that could potentially harm the host system. Fall back to safely failing the task.

@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "lm-local": {
+      "command": "",
+      "args": [
+        "gemini-cli-bridge --url http://localhost:1234/v1 --model local-model"
+      ]
+    }
+  }
+}
