@@ -15,11 +15,15 @@ tasks:
     cmds:
       - uv sync --frozen
 
-
   test:
-    desc: "Run the full test suite"
+    desc: "Run the full test suite (unit tests, diagram compilation, and agent health)"
     cmds:
       - uv run pytest tests/ -v
+      - 'powershell -ExecutionPolicy Bypass -Command "Set-Content -Path test_diagram.d2 -Value ''direction: right; User -> Agent''"'
+      - 'd2 test_diagram.d2 test_diagram.svg'
+      - 'powershell -ExecutionPolicy Bypass -Command "if (Test-Path test_diagram.svg) { Write-Host ''SVG generated successfully'' } else { throw ''SVG generation failed'' }"'
+      - 'powershell -ExecutionPolicy Bypass -Command "Remove-Item test_diagram.d2, test_diagram.svg"'
+      - uv run python -m src.utils.m_health_check
 
   lint:
     desc: "Run ruff static analysis and auto-fix violations on src/ and tests/"
@@ -53,11 +57,6 @@ tasks:
     cmds:
       - gh auth status
       - ssh -T git@github.com || true
-
-  agent:check:
-    desc: "Run the AI Foundry health check (validates endpoint, models, and inference)"
-    cmds:
-      - uv run python -m src.utils.m_health_check
 
   agent:dev:
     desc: "Agent-driven development — reads issue, implements, validates via Gemini CLI"
@@ -103,11 +102,3 @@ tasks:
     cmds:
       - lms unload --all
       - lms server stop
-
-  diagram:test:
-    desc: "Verify D2 compilation by generating a sample SVG"
-    cmds:
-      - 'powershell -ExecutionPolicy Bypass -Command "Set-Content -Path test_diagram.d2 -Value ''direction: right; User -> Agent''"'
-      - 'd2 test_diagram.d2 test_diagram.svg'
-      - 'powershell -ExecutionPolicy Bypass -Command "if (Test-Path test_diagram.svg) { Write-Host ''SVG generated successfully'' } else { throw ''SVG generation failed'' }"'
-      - 'powershell -ExecutionPolicy Bypass -Command "Remove-Item test_diagram.d2, test_diagram.svg"'
