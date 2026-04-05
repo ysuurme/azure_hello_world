@@ -67,11 +67,10 @@ task agent:check
 ```
 
 ### 1. Execution (Single Command)
-Because we migrated into a Lean MVP architecture, startup is completely streamlined via UV:
+Because we migrated into a Lean MVP architecture, startup is completely streamlined via Task:
 
 ```powershell
-uv sync --frozen
-uv run streamlit run src/ui/app.py
+task dev
 ```
 *(Access the UI immediately via `http://localhost:8501`)*
 
@@ -99,7 +98,7 @@ Set `AZURE_AAIF_PROJECT_ENDPOINT` and optionally `AZURE_CLIENT_ID`, `AZURE_TENAN
 
 ## Code Validation
 ```powershell
-python -m pytest -v tests
+task test
 ```
 
 ## 🐳 Container Validation (Production Parity)
