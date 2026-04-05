@@ -288,19 +288,52 @@ function Invoke-EnvironmentBootstrap {
 
     Write-Log "  Generating settings.json dynamically for Bridge..." -Color Gray
     $settingsPath = "$PSScriptRoot\..\..\.gemini\settings.json"
+    # ── VALIDATION ──
+    $McpValid = $true
+    Write-Log "  Validating LM Studio Model Configuration..." -Color Gray
+    $modelsGet = Invoke-RestMethod -Uri "http://localhost:1234/v1/models" -Method Get -ErrorAction SilentlyContinue
+    if (-not $modelsGet) { 
+        Write-Log "⚠️ Validation Failed: Cannot connect to LM Studio on port 1234. Continuing without MCP." -Color Yellow
+        $McpValid = $false
+    }
+    else {
+        $loadedModel = $modelsGet.data | Where-Object { $_.id -eq $LocalAiModel }
+        if (-not $loadedModel) {
+            Write-Log "⚠️ Validation Failed: LM Studio did not load the target model '$LocalAiModel'. Check VRAM. Continuing without MCP." -Color Yellow
+            $McpValid = $false
+        }
+    }
+
+    if ($McpValid) {
+        Write-Log "  Validating MCP Bridge Binary Resolution..." -Color Gray
+        npx.cmd -y @intelligentinternet/gemini-cli-mcp-openai-bridge --help 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "⚠️ Validation Failed: npx.cmd failed to execute the MCP bridge. Verify Node.js is active. Continuing without MCP." -Color Yellow
+            $McpValid = $false
+        }
+    }
+
     $jsonPayload = Get-Content -Raw $settingsPath -ErrorAction SilentlyContinue | ConvertFrom-Json
     if (-not $jsonPayload) { $jsonPayload = [PSCustomObject]@{ mcpServers = [PSCustomObject]@{} } }
     if (-not $jsonPayload.mcpServers) { $jsonPayload | Add-Member -Type NoteProperty -Name mcpServers -Value [PSCustomObject]@{} }
     
-    $jsonPayload.mcpServers | Add-Member -MemberType NoteProperty -Name "lm-local" -Value @{
-        command = "npx"
-        args = @("-y", "@intelligentinternet/gemini-cli-mcp-openai-bridge", "--url", "http://localhost:1234/v1", "--model", $LocalAiModel, "--mode", "edit", "--i-know-what-i-am-doing", "--target-dir", ".")
-    } -Force
-    
+    if ($McpValid) {
+        $jsonPayload.mcpServers | Add-Member -MemberType NoteProperty -Name "lm-local" -Value @{
+            command = "cmd.exe"
+            args = @("/c", "npx", "-y", "@intelligentinternet/gemini-cli-mcp-openai-bridge", "--url", "http://localhost:1234/v1", "--model", $LocalAiModel, "--mode", "edit", "--i-know-what-i-am-doing", "--target-dir", ".")
+        } -Force
+        Write-Log "✅ Local Model Ready & MCP Bridge Validated." -Color Green
+    } else {
+        # Strip the local capability to prevent crashing the agent build process
+        if ($jsonPayload.mcpServers.PSObject.Properties.Name -contains "lm-local") {
+            $jsonPayload.mcpServers.PSObject.Properties.Remove("lm-local")
+        }
+        Write-Log "⚠️ MCP Bridge Disabled. Agentic pipeline running on pure Cloud Models." -Color Magenta
+    }
+
     $jsonString = $jsonPayload | ConvertTo-Json -Depth 10
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false
     [System.IO.File]::WriteAllText($settingsPath, $jsonString, $utf8NoBom)
-    Write-Log "✅ Local Model Ready." -Color Green
 }
 
 function Invoke-EnvironmentTeardown {
