@@ -7,8 +7,14 @@ tasks:
   dev:
     desc: "Start local development (Streamlit UI on port 8501)"
     cmds:
-      - uv sync --frozen
+      - task: install
       - uv run streamlit run src/ui/app.py --server.port 8501
+
+  install:
+    desc: "Install all dependencies using uv"
+    cmds:
+      - uv sync --frozen
+
 
   test:
     desc: "Run the full test suite"
