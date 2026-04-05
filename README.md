@@ -75,6 +75,14 @@ uv run streamlit run src/ui/app.py
 ```
 *(Access the UI immediately via `http://localhost:8501`)*
 
+### 2. Start the MCP Bridge (Local Coding Specialist)
+To enable the agent to perform local code-writing and refactoring (the "Coding Specialist" role), you must start the MCP bridge in a separate terminal:
+
+```powershell
+task agent:local
+```
+*(This bridges the cloud-based Thinking Engine with your local environment securely. Note: This process remains running while you are developing.)*
+
 ### Bootstrap: single shared ClientManager
 
 Create one `ClientManager` at application startup and pass it to the `AgenticOrchestrator` so every agent shares the same authenticated clients and credentials lifecycle:

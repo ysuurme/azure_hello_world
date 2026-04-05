@@ -78,6 +78,11 @@ tasks:
     cmds:
       - powershell -ExecutionPolicy Bypass -File .github/scripts/agent-listener.ps1
 
+  agent:local:
+    desc: "Start the MCP Bridge (lm-local) in a separate terminal for the Coding Specialist role"
+    cmds:
+      - npx @intelligentinternet/gemini-cli-mcp-openai-bridge --url http://localhost:1234/v1 --model local-model --mode edit --i-know-what-i-am-doing --target-dir .
+
   diagram:test:
     desc: "Verify D2 compilation by generating a sample SVG"
     cmds:
