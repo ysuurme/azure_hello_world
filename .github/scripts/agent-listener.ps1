@@ -257,11 +257,64 @@ function Invoke-CleanupBranches {
     }
 }
 
+function Invoke-EnvironmentBootstrap {
+    Write-Log "🚀 Bootstrapping Local AI Environment (LM Studio)" -Color Cyan
+    
+    $envPath = "$PSScriptRoot\..\..\.env"
+    $LocalAiModel = "nerdsking-python-coder-3b-i"
+    if (Test-Path $envPath) {
+        $envContent = Get-Content $envPath
+        foreach ($line in $envContent) {
+            if ($line -match "^LOCAL_AI_MODEL=(.+)$") {
+                $LocalAiModel = $matches[1].Trim()
+                break
+            }
+        }
+    }
+
+    Write-Log "  Starting LMS server..." -Color Gray
+    lms server start 2>&1 | Out-Null
+    Write-Log "  Clearing VRAM safely..." -Color Gray
+    lms unload --all 2>&1 | Out-Null
+    
+    Write-Log "  Loading explicit model ($LocalAiModel) with 32768 context..." -Color Gray
+    $Payload = @{
+        model = $LocalAiModel
+        context_length = 32768
+        flash_attention = $true
+        echo_load_config = $true
+    } | ConvertTo-Json -Depth 10 -Compress
+    Invoke-RestMethod -Uri "http://localhost:1234/api/v1/models/load" -Method Post -Body $Payload -ContentType "application/json" | Out-Null
+
+    Write-Log "  Generating settings.json dynamically for Bridge..." -Color Gray
+    $settingsPath = "$PSScriptRoot\..\..\.gemini\settings.json"
+    $jsonPayload = Get-Content -Raw $settingsPath -ErrorAction SilentlyContinue | ConvertFrom-Json
+    if (-not $jsonPayload) { $jsonPayload = [PSCustomObject]@{ mcpServers = [PSCustomObject]@{} } }
+    if (-not $jsonPayload.mcpServers) { $jsonPayload | Add-Member -Type NoteProperty -Name mcpServers -Value [PSCustomObject]@{} }
+    
+    $jsonPayload.mcpServers | Add-Member -MemberType NoteProperty -Name "lm-local" -Value @{
+        command = "npx"
+        args = @("-y", "@intelligentinternet/gemini-cli-mcp-openai-bridge", "--url", "http://localhost:1234/v1", "--model", $LocalAiModel, "--mode", "edit", "--i-know-what-i-am-doing", "--target-dir", ".")
+    } -Force
+    
+    $jsonPayload | ConvertTo-Json -Depth 10 | Set-Content $settingsPath -Encoding UTF8
+    Write-Log "✅ Local Model Ready." -Color Green
+}
+
+function Invoke-EnvironmentTeardown {
+    Write-Log "🧹 Tearing down Local AI Environment (Clearing VRAM & Stopping Server)..." -Color Yellow
+    $null = lms unload --all
+    $null = lms server stop
+}
+
 # ── Main Loop ──
 
-Write-Log "🚀 Agent listener started. Polling every ${PollIntervalSeconds}s for 'agent:dev' issues." -Color Cyan
+try {
+    Invoke-EnvironmentBootstrap
+    Invoke-CleanupBranches
+    Write-Log "🚀 Agent listener started. Polling every ${PollIntervalSeconds}s for 'agent:dev' issues." -Color Cyan
 
-while ($true) {
+    while ($true) {
     try {
         Write-Log "Checking for tasks..." -Color Cyan
         
@@ -269,7 +322,6 @@ while ($true) {
         $Issue = $IssueRaw | ConvertFrom-Json -ErrorAction SilentlyContinue
 
         if (-not $Issue -or $Issue.Count -eq 0) {
-            Invoke-CleanupBranches
             Start-Sleep -Seconds $PollIntervalSeconds
             continue
         }
@@ -333,4 +385,8 @@ $_
     }
 
     Start-Sleep -Seconds $PollIntervalSeconds
+    }
+}
+finally {
+    Invoke-EnvironmentTeardown
 }

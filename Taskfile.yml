@@ -16,12 +16,7 @@ tasks:
       - uv run pytest tests/ -v
 
   lint:
-    desc: "Run ruff static analysis on src/ and tests/"
-    cmds:
-      - uv run ruff check src/ tests/
-
-  lint:fix:
-    desc: "Auto-fix ruff lint violations"
+    desc: "Run ruff static analysis and auto-fix violations on src/ and tests/"
     cmds:
       - uv run ruff check src/ tests/ --fix
 
@@ -41,11 +36,13 @@ tasks:
       - powershell -ExecutionPolicy Bypass -File .github/scripts/sync-issues.ps1 -ProjectName "{{.GITHUB_PROJECT}}"
 
   sync:dry:
+    internal: true
     desc: "Dry run of issue sync — validates parsing without creating issues"
     cmds:
       - powershell -ExecutionPolicy Bypass -File .github/scripts/sync-issues.ps1 -DryRun -ProjectName "{{.GITHUB_PROJECT}}"
 
   status:
+    internal: true
     desc: "Validate GitHub CLI and SSH environment"
     cmds:
       - gh auth status
@@ -57,6 +54,7 @@ tasks:
       - uv run python -m src.utils.m_health_check
 
   agent:dev:
+    internal: true
     desc: "Agent-driven development — reads issue, implements, validates via Gemini CLI"
     cmds:
       - >-
@@ -65,6 +63,7 @@ tasks:
         Read the full issue with: gh issue view {{.ISSUE}}.
         Follow all rules in GEMINI.md and agents.md.
         Use .agents/skills/ for coding standards.
+        Use the cloud model for high-level reasoning and planning, but explicitly use the lm-local MCP tools for all structured code generation and file implementations.
         Implement the requirements from the issue.
         Validate by running: task test && task lint.
         If validation fails, fix the issues and re-validate.
@@ -75,13 +74,22 @@ tasks:
 
   agent:listen:
     desc: "Start the local agent listener polling for 'agent:dev' labeled issues"
+    deps: [status]
     cmds:
       - powershell -ExecutionPolicy Bypass -File .github/scripts/agent-listener.ps1
 
   agent:local:
+    internal: true
     desc: "Start the MCP Bridge (lm-local) in a separate terminal for the Coding Specialist role"
     cmds:
       - npx @intelligentinternet/gemini-cli-mcp-openai-bridge --url http://localhost:1234/v1 --model local-model --mode edit --i-know-what-i-am-doing --target-dir .
+
+  agent:teardown:
+    internal: true
+    desc: "Clean up the LM Studio environment and clear VRAM safely"
+    cmds:
+      - lms unload --all
+      - lms server stop
 
   diagram:test:
     desc: "Verify D2 compilation by generating a sample SVG"

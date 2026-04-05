@@ -84,3 +84,34 @@ priority = 500
 toolName = "list_dir"
 decision = "allow"
 priority = 500
+
+# Local Model (MCP) tool bindings - Highly prioritized to force code handoff
+[[rule]]
+toolName = "mcp_lm-local_read_file"
+decision = "allow"
+priority = 600
+
+[[rule]]
+toolName = "mcp_lm-local_write_file"
+decision = "allow"
+priority = 600
+
+[[rule]]
+toolName = "mcp_lm-local_replace"
+decision = "allow"
+priority = 600
+
+[[rule]]
+toolName = "mcp_lm-local_list_directory"
+decision = "allow"
+priority = 600
+
+[[rule]]
+toolName = "mcp_lm-local_search_file_content"
+decision = "allow"
+priority = 600
+
+[[rule]]
+toolName = "mcp_lm-local_read_many_files"
+decision = "allow"
+priority = 600
