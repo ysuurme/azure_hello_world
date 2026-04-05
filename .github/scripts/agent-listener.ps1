@@ -224,6 +224,39 @@ function Move-IssueToReview {
     Write-Log "  Issue #$IssueNumber moved to Review." -Color Cyan
 }
 
+function Invoke-CleanupBranches {
+    Write-Log "🧹 Running cleanup for local feature branches..." -Color Cyan
+    
+    # Update remote tracking to identify 'gone' branches
+    git remote prune origin 2>&1 | Out-Null
+    
+    # Identify candidates for deletion:
+    # 1. Branches already merged into master
+    $MergedBranches = git branch --merged master 2>&1 | ForEach-Object { $_.Trim() -replace "^\* ", "" }
+
+    # 2. Branches whose upstream counterparts are gone
+    $GoneBranches = git branch -vv 2>&1 | Select-String ": gone\]" | ForEach-Object {
+        $Parts = $_.ToString().Trim() -split "\s+"
+        if ($Parts[0] -eq "*") { $Parts[1] } else { $Parts[0] }
+    }
+
+    # Combine and deduplicate
+    $Candidates = ($MergedBranches + $GoneBranches) | Select-Object -Unique
+
+    foreach ($Branch in $Candidates) {
+        # Only target feature/issue-* branches that are not 'master' or currently checked out
+        if ($Branch -like "feature/issue-*" -and $Branch -ne "master") {
+            $CurrentBranch = git branch --show-current
+            if ($Branch -eq $CurrentBranch) {
+                continue
+            }
+            
+            Write-Log "  Pruning stale local branch: $Branch" -Color Yellow
+            git branch -D $Branch 2>&1 | Out-Null
+        }
+    }
+}
+
 # ── Main Loop ──
 
 Write-Log "🚀 Agent listener started. Polling every ${PollIntervalSeconds}s for 'agent:dev' issues." -Color Cyan
@@ -236,6 +269,7 @@ while ($true) {
         $Issue = $IssueRaw | ConvertFrom-Json -ErrorAction SilentlyContinue
 
         if (-not $Issue -or $Issue.Count -eq 0) {
+            Invoke-CleanupBranches
             Start-Sleep -Seconds $PollIntervalSeconds
             continue
         }
