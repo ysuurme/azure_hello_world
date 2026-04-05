@@ -319,8 +319,12 @@ function Invoke-EnvironmentBootstrap {
     
     if ($McpValid) {
         $jsonPayload.mcpServers | Add-Member -MemberType NoteProperty -Name "lm-local" -Value @{
-            command = "cmd.exe"
-            args = @("/c", "npx", "-y", "@intelligentinternet/gemini-cli-mcp-openai-bridge", "--url", "http://localhost:1234/v1", "--model", $LocalAiModel, "--mode", "edit", "--i-know-what-i-am-doing", "--target-dir", ".")
+            command = "npx.cmd"
+            args = @("--yes", "--quiet", "@intelligentinternet/gemini-cli-mcp-openai-bridge", "--url", "http://localhost:1234/v1", "--model", $LocalAiModel, "--mode", "edit", "--i-know-what-i-am-doing", "--target-dir", ".")
+            env = @{
+                LOG_LEVEL = "error"
+                GEMINI_API_KEY = "local-bridge-bypass"
+            }
         } -Force
         Write-Log "✅ Local Model Ready & MCP Bridge Validated." -Color Green
     } else {
