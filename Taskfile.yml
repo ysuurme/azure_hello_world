@@ -54,7 +54,6 @@ tasks:
       - uv run python -m src.utils.m_health_check
 
   agent:dev:
-    internal: true
     desc: "Agent-driven development — reads issue, implements, validates via Gemini CLI"
     cmds:
       - >-

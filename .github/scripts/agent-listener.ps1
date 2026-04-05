@@ -297,7 +297,9 @@ function Invoke-EnvironmentBootstrap {
         args = @("-y", "@intelligentinternet/gemini-cli-mcp-openai-bridge", "--url", "http://localhost:1234/v1", "--model", $LocalAiModel, "--mode", "edit", "--i-know-what-i-am-doing", "--target-dir", ".")
     } -Force
     
-    $jsonPayload | ConvertTo-Json -Depth 10 | Set-Content $settingsPath -Encoding UTF8
+    $jsonString = $jsonPayload | ConvertTo-Json -Depth 10
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($settingsPath, $jsonString, $utf8NoBom)
     Write-Log "✅ Local Model Ready." -Color Green
 }
 
