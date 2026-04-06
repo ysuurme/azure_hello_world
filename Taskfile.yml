@@ -55,8 +55,16 @@ tasks:
 
   status:
     internal: true
-    desc: "Validate GitHub CLI and SSH environment"
+    desc: "Validate GitHub CLI, SSH environment, and AGENT_DRIVER value"
     cmds:
+      - >-
+        if [ -n "{{.AGENT_DRIVER}}" ]; then
+          driver=$(echo "{{.AGENT_DRIVER}}" | tr '[:upper:]' '[:lower:]');
+          if [ "$driver" != "gemini" ] && [ "$driver" != "claude" ]; then
+            echo "❌ Invalid AGENT_DRIVER value: '{{.AGENT_DRIVER}}'. Accepted values: gemini, claude.";
+            exit 1;
+          fi;
+        fi
       - gh auth status
       - ssh -T git@github.com || true
 
