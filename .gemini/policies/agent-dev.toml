@@ -115,3 +115,18 @@ priority = 600
 toolName = "mcp_lm-local_read_many_files"
 decision = "allow"
 priority = 600
+
+[[rule]]
+toolName = "mcp_lm-local_glob"
+decision = "allow"
+priority = 600
+
+[[rule]]
+toolName = "mcp_lm-local_google_web_search"
+decision = "allow"
+priority = 600
+
+[[rule]]
+toolName = "mcp_lm-local_web_fetch"
+decision = "allow"
+priority = 600

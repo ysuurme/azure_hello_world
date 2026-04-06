@@ -15,7 +15,7 @@ if (-not (Test-Path $IssuesFile)) {
 $Lines = Get-Content $IssuesFile -Raw
 
 # This regex accurately isolates our ISSUE block constraints
-$Matches = [regex]::Matches($Lines, "(?s)ISSUE:\s*(.*?)\r?\n(.*?)\r?\nEND_ISSUE")
+$Matches = [regex]::Matches($Lines, "(?s)ISSUE:\s*(.*?)\r?\n(.*?)END_ISSUE")
 
 $IssuesCreated = 0
 

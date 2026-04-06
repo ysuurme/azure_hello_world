@@ -287,7 +287,7 @@ function Invoke-EnvironmentBootstrap {
             flash_attention = $true
             echo_load_config = $true
         } | ConvertTo-Json -Depth 10 -Compress
-        Invoke-RestMethod -Uri "http://localhost:1234/api/v1/models/load" -Method Post -Body $Payload -ContentType "application/json" | Out-Null
+        Invoke-RestMethod -Uri "http://127.0.0.1:1234/api/v1/models/load" -Method Post -Body $Payload -ContentType "application/json" | Out-Null
     }
 
     Write-Log "  Generating settings.json dynamically for Bridge..." -Color Gray
@@ -295,7 +295,7 @@ function Invoke-EnvironmentBootstrap {
     # ── VALIDATION ──
     $McpValid = $true
     Write-Log "  Validating LM Studio Model Configuration..." -Color Gray
-    $modelsGet = Invoke-RestMethod -Uri "http://localhost:1234/v1/models" -Method Get -ErrorAction SilentlyContinue
+    $modelsGet = Invoke-RestMethod -Uri "http://127.0.0.1:1234/v1/models" -Method Get -ErrorAction SilentlyContinue
     if (-not $modelsGet) { 
         Write-Log "⚠️ Validation Failed: Cannot connect to LM Studio on port 1234. Continuing without MCP." -Color Yellow
         $McpValid = $false
@@ -317,7 +317,7 @@ function Invoke-EnvironmentBootstrap {
                 messages = @(@{ role = "user"; content = "Respond with only: hello world" })
                 max_tokens = 20
             } | ConvertTo-Json -Depth 10 -Compress
-            $InferResult = Invoke-RestMethod -Uri "http://localhost:1234/v1/chat/completions" -Method Post -Body $InferPayload -ContentType "application/json" -TimeoutSec 30
+            $InferResult = Invoke-RestMethod -Uri "http://127.0.0.1:1234/v1/chat/completions" -Method Post -Body $InferPayload -ContentType "application/json" -TimeoutSec 30
             $Reply = $InferResult.choices[0].message.content.Trim()
             Write-Log "  Inference OK: '$Reply'" -Color Gray
         }
@@ -340,10 +340,18 @@ function Invoke-EnvironmentBootstrap {
     }
 
     if ($McpValid) {
+        # Evict any stale process already bound to the bridge port (e.g. from a previous session)
+        $StaleOwner = (Get-NetTCPConnection -LocalPort $BridgePort -State Listen -ErrorAction SilentlyContinue).OwningProcess
+        if ($StaleOwner) {
+            Write-Log "  Evicting stale process (PID $StaleOwner) on port $BridgePort..." -Color Yellow
+            Stop-Process -Id $StaleOwner -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 1
+        }
+
         Write-Log "  Starting MCP Bridge HTTP server on port $BridgePort..." -Color Gray
         $BridgeArgs = @(
             $CandidatePath,
-            "--url", "http://localhost:1234/v1",
+            "--url", "http://127.0.0.1:1234/v1",
             "--model", $LocalAiModel,
             "--mode", "edit",
             "--i-know-what-i-am-doing",
@@ -368,7 +376,7 @@ function Invoke-EnvironmentBootstrap {
     if ($McpValid) {
         # Use SSE URL transport — avoids Windows stdio spawn pipe issues entirely
         $jsonPayload.mcpServers | Add-Member -MemberType NoteProperty -Name "lm-local" -Value @{
-            url = "http://localhost:$BridgePort/mcp"
+            url = "http://127.0.0.1:$BridgePort/mcp"
         } -Force
         Write-Log "✅ Local Model Ready & MCP Bridge Validated (SSE on port $BridgePort)." -Color Green
     } else {

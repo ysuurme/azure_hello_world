@@ -1,4 +1,4 @@
-# GEMINI.md — Project Context for AI Agents
+# AI.md — Project Context for AI Agents
 
 > **Governance:** Comprehensive structural map, ruleset, and deep architecture. Coding enforcement in [`.agents/skills/`](.agents/skills/).
 
