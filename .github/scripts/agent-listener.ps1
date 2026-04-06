@@ -44,12 +44,17 @@ function Update-IssueLabels {
         [string]$RemoveLabel,
         [string]$AddLabel
     )
+    $LabelArgs = @("issue", "edit", $IssueNumber)
     if ($RemoveLabel) {
-        gh issue edit $IssueNumber --remove-label $RemoveLabel 2>&1 | Out-Null
+        $LabelArgs += "--remove-label"
+        $LabelArgs += $RemoveLabel
     }
     if ($AddLabel) {
-        gh issue edit $IssueNumber --add-label $AddLabel 2>&1 | Out-Null
+        $LabelArgs += "--add-label"
+        $LabelArgs += $AddLabel
     }
+    # Use splatting-like approach for gh command
+    gh @LabelArgs 2>&1 | Out-Null
 }
 
 function Add-IssueComment {
@@ -154,7 +159,7 @@ function Invoke-CommitAndPR {
     }
 
     # Idempotent PR creation: check if PR already exists for this branch
-    $ExistingPr = gh pr list --head $BranchName --json url --limit 1 | ConvertFrom-Json
+    $ExistingPr = @(gh pr list --head $BranchName --json url,number --limit 1 | ConvertFrom-Json)
     if ($ExistingPr.Count -gt 0) {
         $PrUrl = $ExistingPr[0].url
         Write-Log "  PR already exists: $PrUrl. Updated with new commits." -Color Green
@@ -188,7 +193,7 @@ Closes #$IssueNumber
 
         if ($LASTEXITCODE -ne 0) {
             # Double-check for existing PR in case of race condition
-            $ExistingPr = gh pr list --head $BranchName --json url --limit 1 | ConvertFrom-Json
+            $ExistingPr = @(gh pr list --head $BranchName --json url,number --limit 1 | ConvertFrom-Json)
             if ($ExistingPr.Count -gt 0) {
                 return $ExistingPr[0].url
             }
@@ -207,10 +212,10 @@ function Invoke-AgentReview {
     
     Write-Log "🔍 Agent self-reviewing PR..." -Color Yellow
 
-    # Extract PR number from URL
+    # Extract PR number from URL (handles both full URL and just the number)
     $PrNumber = ($PrUrl -split '/')[-1]
     
-    # Execute the true AI review task governed by SKILL.md, passing PR number for diff access
+    # Execute the true AI review task governed by SKILL.md
     $ReviewOutput = task agent:review ISSUE=$IssueNumber PR=$PrNumber 2>&1 | Out-String
     
     if ($ReviewOutput -match "REJECT") {
