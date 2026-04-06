@@ -55,16 +55,8 @@ tasks:
 
   status:
     internal: true
-    desc: "Validate GitHub CLI, SSH environment, and AGENT_DRIVER value"
+    desc: "Validate GitHub CLI and SSH environment"
     cmds:
-      - >-
-        if [ -n "{{.AGENT_DRIVER}}" ]; then
-          driver=$(echo "{{.AGENT_DRIVER}}" | tr '[:upper:]' '[:lower:]');
-          if [ "$driver" != "gemini" ] && [ "$driver" != "claude" ]; then
-            echo "❌ Invalid AGENT_DRIVER value: '{{.AGENT_DRIVER}}'. Accepted values: gemini, claude.";
-            exit 1;
-          fi;
-        fi
       - gh auth status
       - ssh -T git@github.com || true
 
@@ -85,6 +77,9 @@ tasks:
       - >-
         gemini -p
         "You are the Builder agent working on GitHub issue #{{.ISSUE}}.
+        FULL ISSUE CONTEXT:
+        $(gh issue view {{.ISSUE}} --comments)
+
         Read the full issue including comments with: gh issue view {{.ISSUE}} --comments.
         Follow all rules in GEMINI.md and AI.md.
         Use .agents/skills/ for coding standards.
@@ -107,6 +102,9 @@ tasks:
       - >-
         claude --dangerously-skip-permissions -p
         "You are the Builder agent for GitHub issue #{{.ISSUE}}.
+        FULL ISSUE CONTEXT:
+        $(gh issue view {{.ISSUE}} --comments)
+
         Read the full issue: gh issue view {{.ISSUE}} --comments.
         Follow all rules in CLAUDE.md and AI.md. Use .agents/skills/ for coding standards.
         RESEARCH FIRST: Use WebSearch and WebFetch to look up documentation and APIs before writing code.
