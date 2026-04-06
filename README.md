@@ -226,10 +226,12 @@ LOCAL_AI_MODEL=nerdsking-python-coder-3b-i
 
 ## 📚 Project Governance
 
+> **All agents (Gemini, Claude, or other) must read `AI.md` on startup.** It is the single source of truth for project rules, architecture, coding standards, and driver-specific delegation behaviour.
+
 | File | Role |
 |------|------|
-| `GEMINI.md` | Thin structural map — repository layout, rules. Auto-consumed by Gemini CLI. |
-| `agents.md` | Deep architecture — design philosophy, learning goals, session instructions. |
+| `AI.md` | **Primary agent instruction file.** Rules, architecture, model delegation (Gemini + Claude drivers), safety boundaries. Read this first. |
+| `CLAUDE.md` | Redirect to `AI.md` — exists so Claude Code picks it up automatically. |
 | `.agents/skills/` | Coding enforcement protocols (`review-code`, `design-architecture`, `design-infrastructure`, `git-workflow`). |
 | `Taskfile.yml` | Single source of truth for all commands. `task --list` to discover. |
 | `ISSUES.md` | **Single source of truth for the project roadmap.** All future improvements, features, and bugs are written here. |

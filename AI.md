@@ -48,41 +48,49 @@ The `agent-listener.ps1` polls for `agent:dev`-labeled issues. Phase A refines r
 
 ## Model Delegation & Handoff Rules (MANDATORY)
 
+The active driver is set via `AGENT_DRIVER` in `.env` (`gemini` or `claude`). Both drivers share the same delegation principle: the cloud model reasons and plans; the local model generates code.
+
 ### Role Definitions
-- **Cloud Model (Gemini Pro):** Architecture, planning, complex reasoning, multi-step decision-making, code review analysis.
-- **Local Model (`lm-local` MCP):** ALL code generation, file writing, file editing, refactoring, boilerplate, test scaffolding.
+- **Cloud Model (Gemini or Claude, per `AGENT_DRIVER`):** Architecture, planning, complex reasoning, multi-step decision-making, web research, code review analysis.
+- **Local Model (GPU-resident, via LM Studio):** ALL routine code generation, file writing, file editing, refactoring, boilerplate, test scaffolding.
 
-### MCP-First Enforcement (Non-Negotiable)
+### Decision Heuristic (applies to both drivers)
+- **One sentence to describe the change** → delegate to local model.
+- **Multi-step reasoning or cross-file coordination required** → use cloud model tools directly.
 
-When the `lm-local` MCP server is connected and available, **default to it for all routine code-writing operations**. Cloud token budget should be reserved for reasoning and complex tasks.
+**Delegate to local model for:** new files, single-file edits, test files, config files, boilerplate, small refactors.
+**Keep in cloud model for:** multi-file coordinated refactors, security-critical code (auth, credentials, encryption), fixing local model errors, files >200 lines requiring coherence.
 
-**Use `lm-local` MCP tools for (routine work):**
-- Creating new files with well-defined structure (Python, YAML, TOML, Markdown, JSON)
-- Single-file edits with clear, scoped changes
-- Generating test files from explicit specifications
-- Boilerplate, configuration files, and scaffolding
-- Small refactors within a single file (renames, extracts, reorders)
+### Gemini Driver — MCP-First Enforcement
 
-**Use cloud model file tools for (complex work):**
-- Multi-file coordinated refactors (e.g., renaming a function across 6 files)
-- Architectural implementations requiring deep reasoning (async patterns, class hierarchies, state machines)
-- Fixing or correcting output that `lm-local` generated incorrectly
-- Security-sensitive code (auth flows, credential handling, encryption)
-- Files exceeding ~200 lines where coherence matters
+When `AGENT_DRIVER=gemini`, the `lm-local` MCP server (bridge on port 3100) is the delegation mechanism. Default to it for all routine code-writing operations.
 
-**Decision heuristic:** If you can describe the code change in one sentence, use `lm-local`. If the change requires multi-step reasoning or cross-file awareness, use cloud tools.
+**Use `mcp_lm-local_*` tools for all routine work.** Available tools: `write_file`, `read_file`, `replace`, `glob`, `list_directory`, `read_many_files`, `search_file_content`, `google_web_search`, `web_fetch`.
 
-### Cloud Model — Permitted Uses Only
-The cloud model may ONLY be used for:
+If `lm-local` is disconnected, fall back to cloud model file tools and log the fallback in the issue comments.
+
+### Claude Driver — Local LM via HTTP
+
+When `AGENT_DRIVER=claude`, delegation uses a direct HTTP call to LM Studio's Anthropic-compatible endpoint. No MCP bridge is involved.
+
+For all routine code generation, call:
+```bash
+uv run python .github/scripts/local_lm_coder.py \
+  --task "precise description of what to generate" \
+  --context "$(cat path/to/relevant/file.py)"
+```
+Capture stdout and write it to the target file using Write/Edit tools. Do not generate code directly when this rule applies.
+
+Allowed shell commands: `gh`, `task`, `git`, `ruff`, `uv run`, `lms` — see `.claude/settings.json`.
+
+### Cloud Model — Permitted Uses (both drivers)
 1. **Planning**: Deciding what to build, reading issues, analyzing requirements.
 2. **Architecture**: Designing module boundaries, data flow, API contracts.
-3. **Complex Reasoning**: Debugging multi-file interactions, resolving ambiguous requirements.
-4. **Shell Commands**: Running `gh`, `task`, `git`, `ruff` via `run_shell_command`.
-5. **Code Review**: Analyzing diffs, posting PR review comments.
-6. **Complex Code**: Multi-file refactors, security-critical implementations, or correcting `lm-local` errors.
-
-### Fallback Behavior
-If `/mcp list` shows `lm-local` as disconnected or unavailable, the cloud model may use its own file-writing tools as a fallback. Log the fallback in any progress comments posted to the issue.
+3. **Research**: Web search and page fetching for documentation and APIs.
+4. **Complex Reasoning**: Debugging multi-file interactions, resolving ambiguous requirements.
+5. **Shell Commands**: Running `gh`, `task`, `git`, `ruff`.
+6. **Code Review**: Analyzing diffs, posting PR review comments.
+7. **Complex Code**: Multi-file refactors, security-critical implementations, correcting local model errors.
 
 ## Safety & Boundaries (CRITICAL for Headless Agents)
 - **STRICT PROJECT ROOT BOUNDARY:** You must NEVER modify any files, or run any commands that affect files, outside of this project root directory.
