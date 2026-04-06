@@ -301,6 +301,12 @@ function Invoke-EnvironmentBootstrap {
         }
     }
 
+    $ValidDrivers = @("gemini", "claude")
+    if ($ValidDrivers -notcontains $script:AgentDriver) {
+        Write-Log "❌ Invalid AGENT_DRIVER value: '$($script:AgentDriver)'. Accepted values: gemini, claude." -Color Red
+        exit 1
+    }
+
     Write-Log "  Agent driver: $($script:AgentDriver.ToUpper())" -Color Cyan
 
     Write-Log "  Starting LMS server..." -Color Gray
