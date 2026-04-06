@@ -11,9 +11,10 @@
     1. Poll for issues labeled 'agent:dev'
     2. Phase A: Refine raw issue into structured format
     3. Phase B: Create feature branch, run Gemini CLI builder
-    4. Commit with descriptive message, push, create PR
-    5. Agent self-reviews the PR for quality
-    6. Move issue to Review lane, request human approval
+    4. Commit with descriptive message, push, create PR (idempotent)
+    5. Agent AI-reviews the PR for quality
+    6. If approved, move to 'agent:review' for human approval.
+    7. If rejected, move back to 'agent:dev' for revision.
 
 .NOTES
     Start via: task agent:listen
@@ -116,7 +117,8 @@ function Invoke-DevelopPhase {
         }
     }
 
-    Add-IssueComment -IssueNumber $IssueNumber -Body "🌿 Branch ``$BranchName`` created. Running Gemini CLI builder..."
+    $DriverLabel = if ($script:AgentDriver -eq "claude") { "Claude Code" } else { "Gemini CLI" }
+    Add-IssueComment -IssueNumber $IssueNumber -Body "🌿 Branch ``$BranchName`` created. Running $DriverLabel builder..."
 
     # Execute the agent development task
     task agent:dev ISSUE=$IssueNumber 2>&1
@@ -128,14 +130,34 @@ function Invoke-DevelopPhase {
 function Invoke-CommitAndPR {
     param([int]$IssueNumber, [string]$Title)
     
-    # Descriptive commit message with issue context
-    $CommitMessage = "feat(#${IssueNumber}): $Title"
-    git add . 2>&1 | Out-Null
-    git commit -m $CommitMessage 2>&1 | Out-Null
-    git push origin HEAD 2>&1
+    $BranchName = "feature/issue-$IssueNumber"
+    
+    # Check if there are changes to commit
+    $Status = git status --porcelain
+    if (-not $Status) {
+        Write-Log "  No new changes to commit for issue #$IssueNumber." -Color Cyan
+    } else {
+        # Descriptive commit message with issue context
+        $CommitMessage = "feat(#${IssueNumber}): $Title"
+        git add . 2>&1 | Out-Null
+        git commit -m $CommitMessage 2>&1 | Out-Null
+        
+        Write-Log "  Pushing changes to origin $BranchName..." -Color Gray
+        git push origin HEAD 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            throw "git push failed for issue #$IssueNumber"
+        }
+    }
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "git push failed for issue #$IssueNumber"
+    # Check for existing PR
+    Write-Log "  Checking for existing PR for branch $BranchName..." -Color Gray
+    $ExistingPrJson = gh pr list --head $BranchName --json url,number --jq ".[0]" 2>&1 | Out-String
+    if ($ExistingPrJson -and $ExistingPrJson.Trim()) {
+        $ExistingPr = $ExistingPrJson | ConvertFrom-Json
+        if ($ExistingPr -and $ExistingPr.url) {
+            Write-Log "  Existing PR found: $($ExistingPr.url)" -Color Cyan
+            return $ExistingPr.url
+        }
     }
 
     # Build detailed PR description
@@ -157,6 +179,7 @@ Closes #$IssueNumber
     $PrBody | Out-File -FilePath $PrTempFile.FullName -Encoding UTF8
 
     try {
+        Write-Log "  Creating new PR for issue #$IssueNumber..." -Color Gray
         $PrUrl = gh pr create `
             --title "feat(#${IssueNumber}): $Title" `
             --body-file $PrTempFile.FullName `
@@ -164,8 +187,10 @@ Closes #$IssueNumber
             --project $ProjectName 2>&1
 
         if ($LASTEXITCODE -ne 0) {
-            throw "PR creation failed for issue #$IssueNumber"
+            throw "PR creation failed for issue #$IssueNumber. Output: $PrUrl"
         }
+        
+        $PrUrl = $PrUrl.Trim()
         Write-Log "  PR created: $PrUrl" -Color Green
         return $PrUrl
     }
@@ -177,42 +202,36 @@ Closes #$IssueNumber
 function Invoke-AgentReview {
     param([string]$PrUrl, [int]$IssueNumber)
     
-    Write-Log "🔍 Agent self-reviewing PR..." -Color Yellow
+    Write-Log "🔍 Agent AI-reviewing PR #$IssueNumber..." -Color Yellow
 
     # Extract PR number from URL
     $PrNumber = ($PrUrl -split '/')[-1]
     
-    # Get the diff for review context
-    $DiffSummary = gh pr diff $PrNumber --stat 2>&1
+    # Execute the agent review task and capture output
+    # We use --silent to avoid Taskfile noise, but we want the agent's output.
+    $ReviewOutput = task agent:review ISSUE=$IssueNumber PR=$PrNumber --silent 2>&1 | Out-String
     
-    # Post transparent agent review notes on the PR
-    $ReviewBody = @"
-## 🤖 Agent Review Notes
+    if (-not $ReviewOutput.Trim()) {
+        Write-Log "  Review agent returned empty output. Assuming rejection." -Color Red
+        Add-IssueComment -IssueNumber $IssueNumber -Body "🤖 **AI Review Agent Error:** Reviewer returned no feedback."
+        return $false
+    }
 
-### Files Changed
-``````
-$DiffSummary
-``````
+    # Post the review output to the GitHub Issue
+    $FeedbackBody = @"
+🤖 **AI Review Agent Feedback for PR #$PrNumber:**
 
-### Checklist
-- [x] Implementation addresses issue #$IssueNumber requirements
-- [x] ``task test`` passed before commit
-- [x] ``task lint`` passed before commit
-- [ ] Human review required — @ysuurme please validate logic and intent
-
-> This PR was generated by the Builder agent. The Critic (``pr-checks.yml``) will run automated validation. Human approval is required before merge.
+$ReviewOutput
 "@
+    Add-IssueComment -IssueNumber $IssueNumber -Body $FeedbackBody
 
-    $ReviewTempFile = New-TemporaryFile
-    $ReviewBody | Out-File -FilePath $ReviewTempFile.FullName -Encoding UTF8
-    try {
-        gh pr review $PrNumber --comment --body-file $ReviewTempFile.FullName 2>&1 | Out-Null
+    if ($ReviewOutput -match "APPROVED") {
+        Write-Log "  Review APPROVED." -Color Green
+        return $true
+    } else {
+        Write-Log "  Review REJECTED or feedback provided." -Color Red
+        return $false
     }
-    finally {
-        Remove-Item $ReviewTempFile.FullName -ErrorAction SilentlyContinue
-    }
-
-    Write-Log "  Agent review posted on PR #$PrNumber." -Color Green
 }
 
 function Move-IssueToReview {
@@ -220,7 +239,7 @@ function Move-IssueToReview {
     
     # Move issue to Review lane by updating labels
     Update-IssueLabels -IssueNumber $IssueNumber -RemoveLabel "agent:in-progress" -AddLabel "agent:review"
-    Add-IssueComment -IssueNumber $IssueNumber -Body "👀 PR created and agent review posted. Awaiting human approval to merge."
+    Add-IssueComment -IssueNumber $IssueNumber -Body "👀 PR created and agent review approved. Awaiting human approval to merge."
     Write-Log "  Issue #$IssueNumber moved to Review." -Color Cyan
 }
 
@@ -262,15 +281,15 @@ function Invoke-EnvironmentBootstrap {
     
     $envPath = "$PSScriptRoot\..\..\.env"
     $LocalAiModel = "nerdsking-python-coder-3b-i"
+    $script:AgentDriver = "gemini"
     if (Test-Path $envPath) {
         $envContent = Get-Content $envPath
         foreach ($line in $envContent) {
-            if ($line -match "^LOCAL_AI_MODEL=(.+)$") {
-                $LocalAiModel = $matches[1].Trim()
-                break
-            }
+            if ($line -match "^LOCAL_AI_MODEL=(.+)$") { $LocalAiModel = $matches[1].Trim() }
+            if ($line -match "^AGENT_DRIVER=(.+)$")   { $script:AgentDriver = $matches[1].Trim() }
         }
     }
+    Write-Log "  Agent driver: $($script:AgentDriver.ToUpper())" -Color Cyan
 
     Write-Log "  Starting LMS server..." -Color Gray
     lms server start 2>&1 | Out-Null
@@ -327,69 +346,87 @@ function Invoke-EnvironmentBootstrap {
         }
     }
 
-    # Start bridge as HTTP server on port 3100 — avoids Windows stdio spawn pipe bugs
-    $BridgePort = 3100
-    if ($McpValid) {
-        Write-Log "  Resolving MCP Bridge entry point..." -Color Gray
-        $NpmGlobalRoot = (npm root -g 2>$null).Trim()
-        $CandidatePath = Join-Path $NpmGlobalRoot "@intelligentinternet\gemini-cli-mcp-openai-bridge\dist\index.js"
-        if (-not (Test-Path $CandidatePath)) {
-            Write-Log "⚠️ Validation Failed: Cannot resolve MCP bridge at $CandidatePath. Continuing without MCP." -Color Yellow
-            $McpValid = $false
-        }
-    }
-
-    if ($McpValid) {
-        # Evict any stale process already bound to the bridge port (e.g. from a previous session)
-        $StaleOwner = (Get-NetTCPConnection -LocalPort $BridgePort -State Listen -ErrorAction SilentlyContinue).OwningProcess
-        if ($StaleOwner) {
-            Write-Log "  Evicting stale process (PID $StaleOwner) on port $BridgePort..." -Color Yellow
-            Stop-Process -Id $StaleOwner -Force -ErrorAction SilentlyContinue
-            Start-Sleep -Seconds 1
+    if ($script:AgentDriver -eq "gemini") {
+        # ── Gemini driver: start MCP bridge (HTTP/SSE on port 3100) ──
+        $BridgePort = 3100
+        if ($McpValid) {
+            Write-Log "  Resolving MCP Bridge entry point..." -Color Gray
+            $NpmGlobalRoot = (npm root -g 2>$null).Trim()
+            $CandidatePath = Join-Path $NpmGlobalRoot "@intelligentinternet\gemini-cli-mcp-openai-bridge\dist\index.js"
+            if (-not (Test-Path $CandidatePath)) {
+                Write-Log "⚠️ Validation Failed: Cannot resolve MCP bridge at $CandidatePath. Continuing without MCP." -Color Yellow
+                $McpValid = $false
+            }
         }
 
-        Write-Log "  Starting MCP Bridge HTTP server on port $BridgePort..." -Color Gray
-        $BridgeArgs = @(
-            $CandidatePath,
-            "--url", "http://127.0.0.1:1234/v1",
-            "--model", $LocalAiModel,
-            "--mode", "edit",
-            "--i-know-what-i-am-doing",
-            "--target-dir", ".",
-            "--port", "$BridgePort"
-        )
-        $script:BridgeProcess = Start-Process node -ArgumentList $BridgeArgs -PassThru -NoNewWindow -RedirectStandardOutput "$env:TEMP\mcp_bridge_stdout.log" -RedirectStandardError "$env:TEMP\mcp_bridge_stderr.log"
-        Start-Sleep -Seconds 3
+        if ($McpValid) {
+            # Evict any stale process already bound to the bridge port (e.g. from a previous session)
+            $StaleOwner = (Get-NetTCPConnection -LocalPort $BridgePort -State Listen -ErrorAction SilentlyContinue).OwningProcess
+            if ($StaleOwner) {
+                Write-Log "  Evicting stale process (PID $StaleOwner) on port $BridgePort..." -Color Yellow
+                Stop-Process -Id $StaleOwner -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 1
+            }
 
-        if ($script:BridgeProcess.HasExited) {
-            Write-Log "⚠️ Validation Failed: MCP Bridge exited immediately (code $($script:BridgeProcess.ExitCode)). Continuing without MCP." -Color Yellow
-            $McpValid = $false
+            Write-Log "  Starting MCP Bridge HTTP server on port $BridgePort..." -Color Gray
+            $BridgeArgs = @(
+                $CandidatePath,
+                "--url", "http://127.0.0.1:1234/v1",
+                "--model", $LocalAiModel,
+                "--mode", "edit",
+                "--i-know-what-i-am-doing",
+                "--target-dir", ".",
+                "--port", "$BridgePort"
+            )
+            $script:BridgeProcess = Start-Process node -ArgumentList $BridgeArgs -PassThru -NoNewWindow -RedirectStandardOutput "$env:TEMP\mcp_bridge_stdout.log" -RedirectStandardError "$env:TEMP\mcp_bridge_stderr.log"
+            Start-Sleep -Seconds 3
+
+            if ($script:BridgeProcess.HasExited) {
+                Write-Log "⚠️ Validation Failed: MCP Bridge exited immediately (code $($script:BridgeProcess.ExitCode)). Continuing without MCP." -Color Yellow
+                $McpValid = $false
+            } else {
+                Write-Log "  Bridge running (PID: $($script:BridgeProcess.Id)) on http://127.0.0.1:$BridgePort" -Color Gray
+            }
+        }
+
+        $jsonPayload = Get-Content -Raw $settingsPath -ErrorAction SilentlyContinue | ConvertFrom-Json
+        if (-not $jsonPayload) { $jsonPayload = [PSCustomObject]@{ mcpServers = [PSCustomObject]@{} } }
+        if (-not $jsonPayload.mcpServers) { $jsonPayload | Add-Member -Type NoteProperty -Name mcpServers -Value [PSCustomObject]@{} }
+
+        if ($McpValid) {
+            $jsonPayload.mcpServers | Add-Member -MemberType NoteProperty -Name "lm-local" -Value @{
+                url = "http://127.0.0.1:$BridgePort/mcp"
+            } -Force
+            Write-Log "✅ Gemini driver ready. MCP Bridge validated on port $BridgePort." -Color Green
         } else {
-            Write-Log "  Bridge running (PID: $($script:BridgeProcess.Id)) on http://localhost:$BridgePort" -Color Gray
+            if ($jsonPayload.mcpServers.PSObject.Properties.Name -contains "lm-local") {
+                $jsonPayload.mcpServers.PSObject.Properties.Remove("lm-local")
+            }
+            Write-Log "⚠️ MCP Bridge disabled. Gemini running on pure cloud models." -Color Magenta
         }
-    }
 
-    $jsonPayload = Get-Content -Raw $settingsPath -ErrorAction SilentlyContinue | ConvertFrom-Json
-    if (-not $jsonPayload) { $jsonPayload = [PSCustomObject]@{ mcpServers = [PSCustomObject]@{} } }
-    if (-not $jsonPayload.mcpServers) { $jsonPayload | Add-Member -Type NoteProperty -Name mcpServers -Value [PSCustomObject]@{} }
-    
-    if ($McpValid) {
-        # Use SSE URL transport — avoids Windows stdio spawn pipe issues entirely
-        $jsonPayload.mcpServers | Add-Member -MemberType NoteProperty -Name "lm-local" -Value @{
-            url = "http://127.0.0.1:$BridgePort/mcp"
-        } -Force
-        Write-Log "✅ Local Model Ready & MCP Bridge Validated (SSE on port $BridgePort)." -Color Green
+        $jsonString = $jsonPayload | ConvertTo-Json -Depth 10
+        $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText($settingsPath, $jsonString, $utf8NoBom)
+
     } else {
-        # Strip the local MCP to prevent crashing the agent build process
-        if ($jsonPayload.mcpServers.PSObject.Properties.Name -contains "lm-local") {
-            $jsonPayload.mcpServers.PSObject.Properties.Remove("lm-local")
+        # ── Claude driver: validate Anthropic-compatible endpoint, no bridge needed ──
+        Write-Log "  Validating LM Studio Anthropic endpoint (/v1/messages)..." -Color Gray
+        try {
+            $AnthropicPayload = @{
+                model    = $LocalAiModel
+                max_tokens = 20
+                messages = @(@{ role = "user"; content = "Respond with only: hello world" })
+            } | ConvertTo-Json -Depth 10 -Compress
+            $AnthropicResult = Invoke-RestMethod -Uri "http://127.0.0.1:1234/v1/messages" -Method Post -Body $AnthropicPayload -ContentType "application/json" -TimeoutSec 30
+            $AnthropicReply = $AnthropicResult.content[0].text.Trim()
+            Write-Log "✅ Claude driver ready. Anthropic endpoint OK: '$AnthropicReply'" -Color Green
         }
-        Write-Log "⚠️ MCP Bridge Disabled. Agentic pipeline running on pure Cloud Models." -Color Magenta
+        catch {
+            Write-Log "⚠️ Anthropic endpoint validation failed — $_" -Color Yellow
+            Write-Log "   Ensure LM Studio has 'Anthropic-compatible' server mode enabled." -Color Yellow
+        }
     }
-
-    $jsonString = $jsonPayload | ConvertTo-Json -Depth 10
-    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
-    [System.IO.File]::WriteAllText($settingsPath, $jsonString, $utf8NoBom)
 }
 
 function Invoke-EnvironmentTeardown {
@@ -447,16 +484,21 @@ try {
             # Phase B: Develop on feature branch
             Invoke-DevelopPhase -IssueNumber $IssueNumber -Title $IssueTitle
 
-            # Commit, push, create PR with detailed description
+            # Commit, push, create PR (idempotent)
             $PrUrl = Invoke-CommitAndPR -IssueNumber $IssueNumber -Title $IssueTitle
             
-            # Agent self-review: post quality notes on the PR
-            Invoke-AgentReview -PrUrl $PrUrl -IssueNumber $IssueNumber
+            # Agent AI-review
+            $Approved = Invoke-AgentReview -PrUrl $PrUrl -IssueNumber $IssueNumber
 
-            # Move issue to Review lane for human approval
-            Move-IssueToReview -IssueNumber $IssueNumber
-
-            Write-Log "🎉 Issue #${IssueNumber} complete. PR ready for human review." -Color Green
+            if ($Approved) {
+                # Move issue to Review lane for human approval
+                Move-IssueToReview -IssueNumber $IssueNumber
+                Write-Log "🎉 Issue #${IssueNumber} complete. PR ready for human review." -Color Green
+            } else {
+                # Move back to agent:dev for revision
+                Update-IssueLabels -IssueNumber $IssueNumber -RemoveLabel "agent:in-progress" -AddLabel "agent:dev"
+                Write-Log "🔄 Issue #${IssueNumber} needs revision. Moved back to agent:dev." -Color Yellow
+            }
         }
         catch {
             Write-Log "❌ Error on issue #${IssueNumber}: $_" -Color Red

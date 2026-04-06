@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh *)",
+      "Bash(task *)",
+      "Bash(git *)",
+      "Bash(ruff *)",
+      "Bash(uv run python .github/scripts/local_lm_coder.py *)",
+      "Bash(uv run pytest *)",
+      "Bash(uv run *)",
+      "Bash(lms *)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Glob(*)",
+      "Grep(*)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(sudo *)",
+      "Bash(pip install *)",
+      "Bash(npm install -g *)",
+      "Bash(git push --force *)"
+    ]
+  }
+}

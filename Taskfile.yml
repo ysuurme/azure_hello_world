@@ -1,5 +1,7 @@
 version: '3'
 
+dotenv: ['.env']
+
 vars:
   GITHUB_PROJECT: "@hello_architect"
 
@@ -58,14 +60,25 @@ tasks:
       - gh auth status
       - ssh -T git@github.com || true
 
+  # ── Agent: Driver Dispatch ──────────────────────────────────────────────────
+  # Set AGENT_DRIVER=gemini|claude in .env to select the active driver.
+  # Defaults to gemini if unset.
+
   agent:dev:
-    desc: "Agent-driven development — reads issue, implements, validates via Gemini CLI"
+    desc: "Dispatch to active agent driver (AGENT_DRIVER in .env: gemini|claude)"
+    cmds:
+      - task agent:dev:{{.AGENT_DRIVER | default "gemini"}} ISSUE={{.ISSUE}}
+
+  # ── Agent: Gemini Driver ────────────────────────────────────────────────────
+
+  agent:dev:gemini:
+    desc: "Gemini CLI driven development — delegates file ops to lm-local MCP bridge"
     cmds:
       - >-
         gemini -p
         "You are the Builder agent working on GitHub issue #{{.ISSUE}}.
-        Read the full issue with: gh issue view {{.ISSUE}}.
-        Follow all rules in GEMINI.md and agents.md.
+        Read the full issue including comments with: gh issue view {{.ISSUE}} --comments.
+        Follow all rules in GEMINI.md and AI.md.
         Use .agents/skills/ for coding standards.
         RESEARCH FIRST: Before writing any code, use mcp_lm-local_google_web_search and mcp_lm-local_web_fetch to look up relevant documentation, library APIs, or examples needed to implement the requirements correctly. Prefer official docs and source over guessing.
         Use the cloud model for high-level reasoning, planning, and web research synthesis.
@@ -74,9 +87,49 @@ tasks:
         Validate by running: task test && task lint.
         If validation fails, fix the issues and re-validate.
         Do NOT create git commits or branches — the listener handles git operations.
-        IMPORTANT: Keep the user updated! Every few operations or upon completing a milestone, you MUST use run_shell_command to execute `gh issue comment {{.ISSUE}} --body "..."` to post a brief, bulleted progress report.
+        IMPORTANT: Keep the user updated! Every few operations or upon completing a milestone, you MUST post a brief, bulleted progress report to the GitHub Issue.
         When done, output a summary of changes made."
         --policy ./.gemini/policies/agent-dev.toml
+
+  # ── Agent: Claude Driver ────────────────────────────────────────────────────
+
+  agent:dev:claude:
+    desc: "Claude Code driven development — delegates code generation to local LM via HTTP"
+    cmds:
+      - >-
+        claude --dangerously-skip-permissions -p
+        "You are the Builder agent for GitHub issue #{{.ISSUE}}.
+        Read the full issue: gh issue view {{.ISSUE}} --comments.
+        Follow all rules in CLAUDE.md and AI.md. Use .agents/skills/ for coding standards.
+        RESEARCH FIRST: Use WebSearch and WebFetch to look up documentation and APIs before writing code.
+        CODE GENERATION: For all file creation and editing, delegate to the local LM via:
+          uv run python .github/scripts/local_lm_coder.py --task 'what to generate' --context 'relevant existing code'
+          Then write the output to the target file using your Write or Edit tools.
+        Use your own reasoning for multi-file refactors, security-critical code, or fixing local LM errors.
+        Validate: task test && task lint. Fix all failures before finishing.
+        Do NOT create git commits or branches — the listener handles git operations.
+        Post progress updates: gh issue comment {{.ISSUE}} --body '...'
+        When done, output a summary of all changes made."
+
+  # ── Agent: Review ───────────────────────────────────────────────────────────
+
+  agent:review:
+    desc: "Agent-driven review — reads PR diff, critiques via Gemini CLI"
+    cmds:
+      - >-
+        gemini -p
+        "You are the Critic agent reviewing PR #{{.PR}} for GitHub issue #{{.ISSUE}}.
+        Your goal is to provide a rigorous architectural review.
+        1. Read the issue and conversation: gh issue view {{.ISSUE}} --comments
+        2. Read the full PR diff: gh pr diff {{.PR}}
+        3. READ and strictly follow the protocol in .agents/skills/review-code/SKILL.md.
+        4. If the implementation is perfect, start your response with 'APPROVED'.
+        5. If there are violations or improvements needed, start your response with 'REJECTED' and provide a detailed critique using the [Observation], [Principle], [Instruction], [Reference] format as mandated by SKILL.md.
+        6. Do NOT use any tools to modify files. Your role is strictly critical.
+        7. Your output will be parsed by the listener to determine the next step."
+        --policy ./.gemini/policies/agent-dev.toml
+
+  # ── Agent: Listener ─────────────────────────────────────────────────────────
 
   agent:listen:
     desc: "Start the local agent listener polling for 'agent:dev' labeled issues"
@@ -94,9 +147,9 @@ tasks:
 
   agent:local:
     internal: true
-    desc: "Start the MCP Bridge (lm-local) in a separate terminal for the Coding Specialist role"
+    desc: "Start the MCP Bridge (lm-local) for Gemini/Antigravity interactive sessions"
     cmds:
-      - npx @intelligentinternet/gemini-cli-mcp-openai-bridge --url http://localhost:1234/v1 --model local-model --mode edit --i-know-what-i-am-doing --target-dir .
+      - npx @intelligentinternet/gemini-cli-mcp-openai-bridge --url http://127.0.0.1:1234/v1 --model local-model --mode edit --i-know-what-i-am-doing --target-dir .
 
   agent:teardown:
     internal: true

@@ -11,7 +11,10 @@
       "Bash(gemini --version)",
       "Bash(gemini -p \"Check if the lm-local MCP server is connected and list its available tools. Do not write any files.\" --policy ./.gemini/policies/agent-dev.toml)",
       "Bash(timeout 45 gemini -p \"List 3 files in the current directory using lm-local MCP tools. Output only the filenames.\" --policy ./.gemini/policies/agent-dev.toml)",
-      "Bash(powershell -Command \"Stop-Process -Id 12728 -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; netstat -ano | Select-String ':3100'\")"
+      "Bash(powershell -Command \"Stop-Process -Id 12728 -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; netstat -ano | Select-String ':3100'\")",
+      "Bash(python -c \"import dis, marshal, sys; data = open\\('/c/Users/Yanni/Github/Projects/azure_hello_world/.github/scripts/__pycache__/local_coder.cpython-310.pyc', 'rb'\\).read\\(\\); print\\('pyc file size:', len\\(data\\)\\)\")",
+      "Bash(xxd /c/Users/Yanni/Github/Projects/azure_hello_world/.github/scripts/__pycache__/local_coder.cpython-310.pyc)",
+      "Bash(uv run:*)"
     ]
   }
 }
