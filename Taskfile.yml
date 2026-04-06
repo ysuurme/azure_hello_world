@@ -77,10 +77,7 @@ tasks:
       - >-
         gemini -p
         "You are the Builder agent working on GitHub issue #{{.ISSUE}}.
-        FULL ISSUE CONTEXT:
-        $(gh issue view {{.ISSUE}} --comments)
-
-        Read the full issue including comments with: gh issue view {{.ISSUE}} --comments.
+        MANDATORY: You must first read the full issue context and ALL past review comments using: gh issue view {{.ISSUE}} --comments.
         Follow all rules in GEMINI.md and AI.md.
         Use .agents/skills/ for coding standards.
         RESEARCH FIRST: Before writing any code, use mcp_lm-local_google_web_search and mcp_lm-local_web_fetch to look up relevant documentation, library APIs, or examples needed to implement the requirements correctly. Prefer official docs and source over guessing.
@@ -102,10 +99,7 @@ tasks:
       - >-
         claude --dangerously-skip-permissions -p
         "You are the Builder agent for GitHub issue #{{.ISSUE}}.
-        FULL ISSUE CONTEXT:
-        $(gh issue view {{.ISSUE}} --comments)
-
-        Read the full issue: gh issue view {{.ISSUE}} --comments.
+        MANDATORY: You must first read the full issue context and ALL past review comments using: gh issue view {{.ISSUE}} --comments.
         Follow all rules in CLAUDE.md and AI.md. Use .agents/skills/ for coding standards.
         RESEARCH FIRST: Use WebSearch and WebFetch to look up documentation and APIs before writing code.
         CODE GENERATION: For all file creation and editing, delegate to the local LM via:

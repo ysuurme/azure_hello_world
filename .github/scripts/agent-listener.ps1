@@ -210,8 +210,8 @@ function Invoke-AgentReview {
     # Extract PR number from URL
     $PrNumber = ($PrUrl -split '/')[-1]
     
-    # Execute the true AI review task governed by SKILL.md
-    $ReviewOutput = task agent:review ISSUE=$IssueNumber 2>&1 | Out-String
+    # Execute the true AI review task governed by SKILL.md, passing PR number for diff access
+    $ReviewOutput = task agent:review ISSUE=$IssueNumber PR=$PrNumber 2>&1 | Out-String
     
     if ($ReviewOutput -match "REJECT") {
         Write-Log "  ❌ Review REJECTED. Posting feedback to issue #$IssueNumber." -Color Red
