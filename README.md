@@ -231,7 +231,6 @@ LOCAL_AI_MODEL=nerdsking-python-coder-3b-i
 | File | Role |
 |------|------|
 | `AI.md` | **Primary agent instruction file.** Rules, architecture, model delegation (Gemini + Claude drivers), safety boundaries. Read this first. |
-| `CLAUDE.md` | Redirect to `AI.md` — exists so Claude Code picks it up automatically. |
 | `.agents/skills/` | Coding enforcement protocols (`review-code`, `design-architecture`, `design-infrastructure`, `git-workflow`). |
 | `Taskfile.yml` | Single source of truth for all commands. `task --list` to discover. |
 | `ISSUES.md` | **Single source of truth for the project roadmap.** All future improvements, features, and bugs are written here. |
