@@ -1,16 +1,20 @@
-<# 
+<#
 .SYNOPSIS
     Local agent listener that polls GitHub for issues labeled 'agent:dev'.
-    Two-phase loop: Refine (formalize issue) → Develop (execute task).
+    Dual-driver architecture: Gemini CLI (MCP bridge) or Claude Code (direct HTTP).
 
 .DESCRIPTION
     TEMPORARY ARCHITECTURE — This laptop-based listener is a Phase 1 scaffold.
     The production target is GitHub Codespaces with event-driven spin-up.
 
+    Set AGENT_DRIVER=gemini|claude in .env to select the active driver.
+    Gemini driver: starts MCP bridge (lm-local) for file I/O delegation via port 3100.
+    Claude driver: skips bridge, validates Anthropic /v1/messages endpoint instead.
+
     Workflow:
     1. Poll for issues labeled 'agent:dev'
     2. Phase A: Refine raw issue into structured format
-    3. Phase B: Create feature branch, run Gemini CLI builder
+    3. Phase B: Create feature branch, run active driver builder
     4. Commit with descriptive message, push, create PR (idempotent)
     5. Agent self-reviews the PR using a true AI critic
     6. If rejected: post feedback, stay in 'agent:dev'. If approved: move to 'agent:review'.
@@ -23,6 +27,8 @@
 $LogFile = "$PSScriptRoot\..\..\logs\agent-listener.log"
 $PollIntervalSeconds = 60
 $ProjectName = "@hello_architect"
+$script:AgentDriver = "gemini"
+$script:LocalAiUrl = "http://127.0.0.1:1234"
 
 function Write-Log {
     param([string]$Message, [string]$Color = "White")
@@ -116,7 +122,8 @@ function Invoke-DevelopPhase {
         }
     }
 
-    Add-IssueComment -IssueNumber $IssueNumber -Body "🌿 Branch ``$BranchName`` created. Running Gemini CLI builder..."
+    $DriverLabel = if ($script:AgentDriver -eq "claude") { "Claude Code" } else { "Gemini CLI" }
+    Add-IssueComment -IssueNumber $IssueNumber -Body "🌿 Branch ``$BranchName`` created. Running $DriverLabel builder..."
 
     # Execute the agent development task
     task agent:dev ISSUE=$IssueNumber 2>&1
@@ -280,19 +287,21 @@ function Invoke-CleanupBranches {
 }
 
 function Invoke-EnvironmentBootstrap {
-    Write-Log "🚀 Bootstrapping Local AI Environment (LM Studio)" -Color Cyan
-    
+    Write-Log "🚀 Bootstrapping Local AI Environment" -Color Cyan
+
+    # Read driver config from .env
     $envPath = "$PSScriptRoot\..\..\.env"
     $LocalAiModel = "nerdsking-python-coder-3b-i"
     if (Test-Path $envPath) {
         $envContent = Get-Content $envPath
         foreach ($line in $envContent) {
-            if ($line -match "^LOCAL_AI_MODEL=(.+)$") {
-                $LocalAiModel = $matches[1].Trim()
-                break
-            }
+            if ($line -match "^LOCAL_AI_MODEL=(.+)$") { $LocalAiModel = $matches[1].Trim() }
+            if ($line -match "^AGENT_DRIVER=(.+)$")   { $script:AgentDriver = $matches[1].Trim().ToLower() }
+            if ($line -match "^LOCAL_AI_URL=(.+)$")   { $script:LocalAiUrl = $matches[1].Trim() }
         }
     }
+
+    Write-Log "  Agent driver: $($script:AgentDriver.ToUpper())" -Color Cyan
 
     Write-Log "  Starting LMS server..." -Color Gray
     lms server start 2>&1 | Out-Null
@@ -301,117 +310,131 @@ function Invoke-EnvironmentBootstrap {
     } else {
         Write-Log "  Clearing VRAM safely..." -Color Gray
         lms unload --all 2>&1 | Out-Null
-        
+
         Write-Log "  Loading explicit model ($LocalAiModel) with 32768 context..." -Color Gray
         $Payload = @{
-            model = $LocalAiModel
+            model          = $LocalAiModel
             context_length = 32768
             flash_attention = $true
             echo_load_config = $true
         } | ConvertTo-Json -Depth 10 -Compress
-        Invoke-RestMethod -Uri "http://127.0.0.1:1234/api/v1/models/load" -Method Post -Body $Payload -ContentType "application/json" | Out-Null
+        Invoke-RestMethod -Uri "$($script:LocalAiUrl)/api/v1/models/load" -Method Post -Body $Payload -ContentType "application/json" | Out-Null
     }
 
-    Write-Log "  Generating settings.json dynamically for Bridge..." -Color Gray
-    $settingsPath = "$PSScriptRoot\..\..\.gemini\settings.json"
-    # ── VALIDATION ──
-    $McpValid = $true
-    Write-Log "  Validating LM Studio Model Configuration..." -Color Gray
-    $modelsGet = Invoke-RestMethod -Uri "http://127.0.0.1:1234/v1/models" -Method Get -ErrorAction SilentlyContinue
-    if (-not $modelsGet) { 
-        Write-Log "⚠️ Validation Failed: Cannot connect to LM Studio on port 1234. Continuing without MCP." -Color Yellow
-        $McpValid = $false
-    }
-    else {
-        $loadedModel = $modelsGet.data | Where-Object { $_.id -eq $LocalAiModel }
-        if (-not $loadedModel) {
-            Write-Log "⚠️ Validation Failed: LM Studio did not load the target model '$LocalAiModel'. Check VRAM. Continuing without MCP." -Color Yellow
-            $McpValid = $false
-        }
-    }
+    if ($script:AgentDriver -eq "gemini") {
+        # ── GEMINI: Validate LM Studio + Start MCP Bridge ──────────────────────
+        $McpValid = $true
+        $BridgePort = 3100
+        $settingsPath = "$PSScriptRoot\..\..\.gemini\settings.json"
 
-    # Validate inference with a hello world call
-    if ($McpValid) {
-        Write-Log "  Validating inference with hello world call..." -Color Gray
-        try {
-            $InferPayload = @{
-                model = $LocalAiModel
-                messages = @(@{ role = "user"; content = "Respond with only: hello world" })
-                max_tokens = 20
-            } | ConvertTo-Json -Depth 10 -Compress
-            $InferResult = Invoke-RestMethod -Uri "http://127.0.0.1:1234/v1/chat/completions" -Method Post -Body $InferPayload -ContentType "application/json" -TimeoutSec 30
-            $Reply = $InferResult.choices[0].message.content.Trim()
-            Write-Log "  Inference OK: '$Reply'" -Color Gray
-        }
-        catch {
-            Write-Log "⚠️ Validation Failed: Inference call failed — $_. Continuing without MCP." -Color Yellow
-            $McpValid = $false
-        }
-    }
-
-    # Start bridge as HTTP server on port 3100 — avoids Windows stdio spawn pipe bugs
-    $BridgePort = 3100
-    if ($McpValid) {
-        Write-Log "  Resolving MCP Bridge entry point..." -Color Gray
-        $NpmGlobalRoot = (npm root -g 2>$null).Trim()
-        $CandidatePath = Join-Path $NpmGlobalRoot "@intelligentinternet\gemini-cli-mcp-openai-bridge\dist\index.js"
-        if (-not (Test-Path $CandidatePath)) {
-            Write-Log "⚠️ Validation Failed: Cannot resolve MCP bridge at $CandidatePath. Continuing without MCP." -Color Yellow
-            $McpValid = $false
-        }
-    }
-
-    if ($McpValid) {
-        # Evict any stale process already bound to the bridge port (e.g. from a previous session)
-        $StaleOwner = (Get-NetTCPConnection -LocalPort $BridgePort -State Listen -ErrorAction SilentlyContinue).OwningProcess
-        if ($StaleOwner) {
-            Write-Log "  Evicting stale process (PID $StaleOwner) on port $BridgePort..." -Color Yellow
-            Stop-Process -Id $StaleOwner -Force -ErrorAction SilentlyContinue
-            Start-Sleep -Seconds 1
-        }
-
-        Write-Log "  Starting MCP Bridge HTTP server on port $BridgePort..." -Color Gray
-        $BridgeArgs = @(
-            $CandidatePath,
-            "--url", "http://127.0.0.1:1234/v1",
-            "--model", $LocalAiModel,
-            "--mode", "edit",
-            "--i-know-what-i-am-doing",
-            "--target-dir", ".",
-            "--port", "$BridgePort"
-        )
-        $script:BridgeProcess = Start-Process node -ArgumentList $BridgeArgs -PassThru -NoNewWindow -RedirectStandardOutput "$env:TEMP\mcp_bridge_stdout.log" -RedirectStandardError "$env:TEMP\mcp_bridge_stderr.log"
-        Start-Sleep -Seconds 3
-
-        if ($script:BridgeProcess.HasExited) {
-            Write-Log "⚠️ Validation Failed: MCP Bridge exited immediately (code $($script:BridgeProcess.ExitCode)). Continuing without MCP." -Color Yellow
+        Write-Log "  Validating LM Studio Model Configuration..." -Color Gray
+        $modelsGet = Invoke-RestMethod -Uri "$($script:LocalAiUrl)/v1/models" -Method Get -ErrorAction SilentlyContinue
+        if (-not $modelsGet) {
+            Write-Log "⚠️ Validation Failed: Cannot connect to LM Studio. Continuing without MCP." -Color Yellow
             $McpValid = $false
         } else {
-            Write-Log "  Bridge running (PID: $($script:BridgeProcess.Id)) on http://localhost:$BridgePort" -Color Gray
+            $loadedModel = $modelsGet.data | Where-Object { $_.id -eq $LocalAiModel }
+            if (-not $loadedModel) {
+                Write-Log "⚠️ Validation Failed: Target model '$LocalAiModel' not loaded. Check VRAM. Continuing without MCP." -Color Yellow
+                $McpValid = $false
+            }
         }
-    }
 
-    $jsonPayload = Get-Content -Raw $settingsPath -ErrorAction SilentlyContinue | ConvertFrom-Json
-    if (-not $jsonPayload) { $jsonPayload = [PSCustomObject]@{ mcpServers = [PSCustomObject]@{} } }
-    if (-not $jsonPayload.mcpServers) { $jsonPayload | Add-Member -Type NoteProperty -Name mcpServers -Value [PSCustomObject]@{} }
-    
-    if ($McpValid) {
-        # Use SSE URL transport — avoids Windows stdio spawn pipe issues entirely
-        $jsonPayload.mcpServers | Add-Member -MemberType NoteProperty -Name "lm-local" -Value @{
-            url = "http://127.0.0.1:$BridgePort/mcp"
-        } -Force
-        Write-Log "✅ Local Model Ready & MCP Bridge Validated (SSE on port $BridgePort)." -Color Green
+        if ($McpValid) {
+            Write-Log "  Validating inference with hello world call..." -Color Gray
+            try {
+                $InferPayload = @{
+                    model    = $LocalAiModel
+                    messages = @(@{ role = "user"; content = "Respond with only: hello world" })
+                    max_tokens = 20
+                } | ConvertTo-Json -Depth 10 -Compress
+                $InferResult = Invoke-RestMethod -Uri "$($script:LocalAiUrl)/v1/chat/completions" -Method Post -Body $InferPayload -ContentType "application/json" -TimeoutSec 30
+                $Reply = $InferResult.choices[0].message.content.Trim()
+                Write-Log "  Inference OK: '$Reply'" -Color Gray
+            } catch {
+                Write-Log "⚠️ Validation Failed: Inference call failed — $_. Continuing without MCP." -Color Yellow
+                $McpValid = $false
+            }
+        }
+
+        if ($McpValid) {
+            Write-Log "  Resolving MCP Bridge entry point..." -Color Gray
+            $NpmGlobalRoot = (npm root -g 2>$null).Trim()
+            $CandidatePath = Join-Path $NpmGlobalRoot "@intelligentinternet\gemini-cli-mcp-openai-bridge\dist\index.js"
+            if (-not (Test-Path $CandidatePath)) {
+                Write-Log "⚠️ Validation Failed: Cannot resolve MCP bridge at $CandidatePath. Continuing without MCP." -Color Yellow
+                $McpValid = $false
+            }
+        }
+
+        if ($McpValid) {
+            # Evict any stale process already bound to the bridge port
+            $StaleOwner = (Get-NetTCPConnection -LocalPort $BridgePort -State Listen -ErrorAction SilentlyContinue).OwningProcess
+            if ($StaleOwner) {
+                Write-Log "  Evicting stale process (PID $StaleOwner) on port $BridgePort..." -Color Yellow
+                Stop-Process -Id $StaleOwner -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 1
+            }
+
+            # Start bridge as HTTP server — avoids Windows stdio spawn pipe bugs
+            Write-Log "  Starting MCP Bridge HTTP server on port $BridgePort..." -Color Gray
+            $BridgeArgs = @(
+                $CandidatePath,
+                "--url", "$($script:LocalAiUrl)/v1",
+                "--model", $LocalAiModel,
+                "--mode", "edit",
+                "--i-know-what-i-am-doing",
+                "--target-dir", ".",
+                "--port", "$BridgePort"
+            )
+            $script:BridgeProcess = Start-Process node -ArgumentList $BridgeArgs -PassThru -NoNewWindow -RedirectStandardOutput "$env:TEMP\mcp_bridge_stdout.log" -RedirectStandardError "$env:TEMP\mcp_bridge_stderr.log"
+            Start-Sleep -Seconds 3
+
+            if ($script:BridgeProcess.HasExited) {
+                Write-Log "⚠️ Validation Failed: MCP Bridge exited immediately (code $($script:BridgeProcess.ExitCode)). Continuing without MCP." -Color Yellow
+                $McpValid = $false
+            } else {
+                Write-Log "  Bridge running (PID: $($script:BridgeProcess.Id)) on http://127.0.0.1:$BridgePort" -Color Gray
+            }
+        }
+
+        # Write settings.json for Gemini CLI MCP config
+        $jsonPayload = Get-Content -Raw $settingsPath -ErrorAction SilentlyContinue | ConvertFrom-Json
+        if (-not $jsonPayload) { $jsonPayload = [PSCustomObject]@{ mcpServers = [PSCustomObject]@{} } }
+        if (-not $jsonPayload.mcpServers) { $jsonPayload | Add-Member -Type NoteProperty -Name mcpServers -Value [PSCustomObject]@{} }
+
+        if ($McpValid) {
+            $jsonPayload.mcpServers | Add-Member -MemberType NoteProperty -Name "lm-local" -Value @{
+                url = "http://127.0.0.1:$BridgePort/mcp"
+            } -Force
+            Write-Log "✅ Local Model Ready & MCP Bridge Validated (SSE on port $BridgePort)." -Color Green
+        } else {
+            if ($jsonPayload.mcpServers.PSObject.Properties.Name -contains "lm-local") {
+                $jsonPayload.mcpServers.PSObject.Properties.Remove("lm-local")
+            }
+            Write-Log "⚠️ MCP Bridge Disabled. Agentic pipeline running on pure Cloud Models." -Color Magenta
+        }
+
+        $jsonString = $jsonPayload | ConvertTo-Json -Depth 10
+        $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText($settingsPath, $jsonString, $utf8NoBom)
+
     } else {
-        # Strip the local MCP to prevent crashing the agent build process
-        if ($jsonPayload.mcpServers.PSObject.Properties.Name -contains "lm-local") {
-            $jsonPayload.mcpServers.PSObject.Properties.Remove("lm-local")
+        # ── CLAUDE: Validate Anthropic /v1/messages endpoint ───────────────────
+        Write-Log "  Validating Anthropic endpoint ($($script:LocalAiUrl)/v1/messages)..." -Color Gray
+        try {
+            $ClaudePayload = @{
+                model      = $LocalAiModel
+                max_tokens = 20
+                messages   = @(@{ role = "user"; content = "Say hello" })
+            } | ConvertTo-Json -Depth 10 -Compress
+            $Headers = @{ "x-api-key" = "local"; "anthropic-version" = "2023-06-01" }
+            $null = Invoke-RestMethod -Uri "$($script:LocalAiUrl)/v1/messages" -Method Post -Body $ClaudePayload -ContentType "application/json" -Headers $Headers -TimeoutSec 30
+            Write-Log "✅ Anthropic endpoint validated. Local model responding." -Color Green
+        } catch {
+            Write-Log "⚠️ Anthropic endpoint validation failed: $_. Claude driver will use cloud model only." -Color Yellow
         }
-        Write-Log "⚠️ MCP Bridge Disabled. Agentic pipeline running on pure Cloud Models." -Color Magenta
     }
-
-    $jsonString = $jsonPayload | ConvertTo-Json -Depth 10
-    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
-    [System.IO.File]::WriteAllText($settingsPath, $jsonString, $utf8NoBom)
 }
 
 function Invoke-EnvironmentTeardown {
