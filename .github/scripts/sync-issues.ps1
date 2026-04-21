@@ -3,12 +3,12 @@ param(
     [string]$ProjectName = "@hello_architect"
 )
 
-$IssuesFile = "$PSScriptRoot\..\..\ISSUES.md"
+$IssuesFile = "$PSScriptRoot\..\..\TODO.md"
 
 Write-Host "🚀 Starting GitHub Issue Sync using PowerShell..." -ForegroundColor Cyan
 
 if (-not (Test-Path $IssuesFile)) {
-    Write-Error "ISSUES.md not found at path: $IssuesFile"
+    Write-Error "TODO.md not found at path: $IssuesFile"
     exit 1
 }
 
@@ -55,7 +55,7 @@ foreach ($Match in $Matches) {
                     $UpdatedLines += $Line
                 }
             }
-            # Overwrite ISSUES.md
+            # Overwrite TODO.md
             $UpdatedLines | Set-Content $IssuesFile -Encoding UTF8
         } else {
             Write-Host "  🚫 Failed to create issue: $Title" -ForegroundColor Red
@@ -70,5 +70,5 @@ foreach ($Match in $Matches) {
 if ($DryRun) {
     Write-Host "🎉 Dry Run complete. Checked $($Matches.Count) pending issues safely." -ForegroundColor Magenta
 } else {
-    Write-Host "🎉 Integration sync complete! $IssuesCreated new issues tracked into ISSUES.md." -ForegroundColor Green
+    Write-Host "🎉 Sync complete! $IssuesCreated issues created and removed from TODO.md." -ForegroundColor Green
 }

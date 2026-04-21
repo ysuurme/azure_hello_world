@@ -1,24 +1,45 @@
-# Azure Architecture Agent
+# azure_hello_world — Architecture Composition Engine
 
-**The Technical Design Authority (TDA) Agent**
+**AI-driven artifact creation: from requirements to approved architecture designs.**
 
-This system is a mature, stateful "Solution Architecture Composer". Moving past single-prompt Chat-over-PDF patterns, it utilizes a cyclical agentic routing loop (inspired by Microsoft Agent Framework concepts) to stringently intake user requirements against the Microsoft Well-Architected Framework, query a structured Capability RAG repository, and finally generate both a formal 5-point architecture document and a raw **D2 Visual diagram** mapped securely via Python subprocesses!
+This repository is one half of a two-repo system. It owns the **agentic pipeline** that turns raw requirements into formal architecture documents and D2 diagrams. Its companion repository, [`my_second_brain`](https://github.com/ysuurme/my_second_brain), owns the **knowledge store** that this engine reads from and writes to.
+
+## Two-Repo Architecture
+
+```
+azure_hello_world                          my_second_brain
+─────────────────────────────────          ──────────────────────────────────────
+Architecture Composition Engine            Knowledge Repository & Daily Cockpit
+─────────────────────────────────          ──────────────────────────────────────
+• Agentic Orchestrator                     • Keep → Gemini → Drive note pipeline
+• Intake Reviewer agent                    • Capability Framework (L1 / L2 / L3)
+• Architecture Composer agent              • Technology cards
+• Streamlit UI + D2 diagram rendering      • Architecture Design archive
+• Azure AI Foundry client                    (templates + approved designs)
+• GitHub Issue → PR automation             • Pattern Library
+                                           • Domain models + filesystem adapters
+
+        READS capabilities ──────────────────────────────────────►
+        WRITES approved designs ◄────────────────────────────────
+```
+
+**Separation of concerns:** this repo stays focused on agent logic and UI; `my_second_brain` owns all artifact storage and retrieval. The Capability Framework (L1/L2/L3 with technology cards) lives in `my_second_brain` and is read here at runtime via filesystem adapters.
 
 ---
 
-## 🛡️ Core Architecture Updates (Live MVP)
+## Core Architecture
 
-1. **Lean Boundary Mediation**: For the active MVP, the Azure Function trigger overhead has been decoupled. Streamlit natively invokes the `AgenticOrchestrator` synchronously. This allows for rapid, unified local development testing without Docker network proxy complexity.
-2. **Secure Entra ID AI Identity**: Hardcoded API keys (`OPENAI_API_KEY`) are completely banned in this repository. Our factory (`m_agentfactory.py`) natively leverages `azure-ai-projects` and `azure-identity` (`DefaultAzureCredential`). Your underlying OS terminal login (`az login`) automatically issues temporary tokens over the data-plane using RBAC.
-3. **D2 Diagram Visual Engine**: Using isolated Python `subprocess` bindings executing a static GO compilation of [D2](https://d2lang.com/), the LLM physically drafts SVG architectural diagrams rendered natively dynamically directly into the Streamlit Chat state.
-4. **Structured RAG Repository**: The `/capabilities/` directory operates as a Git-backed Document Intelligence engine. It stores Markdown definitions enhanced with exact YAML Frontmatter targeting system constraints dynamically.
-5. **Continuous Persistence**: The `ArchitecturePersister` (`src/utils/m_persist_design.py`) caches all successfully approved AI-generated SVG and MD deliverables securely onto timestamped local directories for history.
+1. **Lean Boundary Mediation**: Streamlit natively invokes the `AgenticOrchestrator` synchronously, decoupled from Azure Function trigger overhead for rapid local development.
+2. **Secure Entra ID AI Identity**: No hardcoded API keys. `m_agentfactory.py` uses `azure-ai-projects` + `DefaultAzureCredential`; `az login` issues temporary RBAC tokens automatically.
+3. **D2 Diagram Visual Engine**: Python `subprocess` bindings execute a statically compiled [D2](https://d2lang.com/) binary; the LLM drafts SVG diagrams rendered live into Streamlit chat state.
+4. **Capability RAG via `my_second_brain`**: At runtime, agents read the Capability Framework (L1/L2/L3 technology cards) from `my_second_brain` via filesystem adapters. The `/capabilities/` directory in this repo is a **transitional cache** — the canonical store is being migrated there.
+5. **Approved Design Persistence**: `ArchitecturePersister` (`src/utils/m_persist_design.py`) writes timestamped SVG + MD deliverables into `my_second_brain`'s Architecture Design archive on approval.
 
 ---
 
-## 🧠 Agentic Application Architecture
+## Agentic Pipeline
 
-The system achieves "Solution Architecture" reasoning not by using massive unmanageable monolithic prompts, but by stringing specialized agents together using a finite state machine loop called the **Agentic Orchestrator**:
+The system achieves solution architecture reasoning by routing through specialized agents in a finite state machine loop — the **Agentic Orchestrator** — rather than a single monolithic prompt:
 
 ```mermaid
 graph TD
@@ -30,10 +51,11 @@ graph TD
     
     %% GENERATION PHASE
     AO -->|State: GENERATION| AC(👷 Architecture Composer)
-    AC -->|Search Vector RAG| RAG[(📁 /capabilities/ MDs)]
+    AC -->|Read capabilities| MSB[(📁 my_second_brain)]
     AC -->|Extracts Pricing| CALC(💲 Retail Cost Sync Tool)
     AC -->|Azure Foundry Inference| SVG(🖨️ D2 Engine)
     SVG -->|Renders Visuals| UI
+    AC -->|Write approved design| MSB
     
     classDef agent fill:#0a5a9c,color:#fff,stroke:#fff,stroke-width:2px,rx:10px,ry:10px;
     classDef sys fill:#333,color:#fff,stroke:#fff,stroke-width:1px,rx:5px,ry:5px;
@@ -43,7 +65,7 @@ graph TD
 
 ---
 
-## 🚀 Native Local Deployment
+## Local Deployment
 
 ### Prerequisites
 
@@ -101,7 +123,7 @@ Set `AZURE_AAIF_PROJECT_ENDPOINT` and optionally `AZURE_CLIENT_ID`, `AZURE_TENAN
 task test
 ```
 
-## 🐳 Container Validation (Production Parity)
+## Container Validation (Production Parity)
 Our Container respects strictly hardened Rootless Multi-Stage paradigms. 
 The D2 engine `.tar.gz` is safely pulled within an isolated builder container, and only the raw static binary mapped directly into an `appuser` distroless linux runtime layer to eliminate arbitrary system vulnerability vectors.
 
@@ -122,7 +144,7 @@ docker compose -f docker-compose.dev.yml up --build
 
 ---
 
-## 📜 Agent Skills Framework (`.agents/skills/`)
+## Agent Skills Framework (`.agents/skills/`)
 AI Agents operating in this workspace act as the "Senior Educational Software Architect" and evaluate code geometry via three exclusive protocols:
 
 1. **`design-architecture`**: Dictates component Single Responsibility and State routing logic. Enforces "Standard Library First".
@@ -131,7 +153,7 @@ AI Agents operating in this workspace act as the "Senior Educational Software Ar
 
 ---
 
-## 🤖 Agentic Development (GitHub Issues → PR)
+## Agentic Development (GitHub Issues → PR)
 
 Development tasks execute through a headless "Director Workflow" — create an issue from your phone, and a local agent listener builds, tests, and delivers a PR for your review.
 
@@ -224,7 +246,7 @@ LOCAL_AI_MODEL=nerdsking-python-coder-3b-i
 
 ---
 
-## 📚 Project Governance
+## Project Governance
 
 > **All agents (Gemini, Claude, or other) must read `AI.md` on startup.** It is the single source of truth for project rules, architecture, coding standards, and driver-specific delegation behaviour.
 
@@ -233,14 +255,14 @@ LOCAL_AI_MODEL=nerdsking-python-coder-3b-i
 | `AI.md` | **Primary agent instruction file.** Rules, architecture, model delegation (Gemini + Claude drivers), safety boundaries. Read this first. |
 | `.agents/skills/` | Coding enforcement protocols (`review-code`, `design-architecture`, `design-infrastructure`, `git-workflow`). |
 | `Taskfile.yml` | Single source of truth for all commands. `task --list` to discover. |
-| `ISSUES.md` | **Single source of truth for the project roadmap.** All future improvements, features, and bugs are written here. |
+| `TODO.md` | **Single source of truth for the project roadmap.** All future improvements, features, and bugs are written here. |
 
 ### Adding Improvements
 
-All future work — features, bugs, refactors — must be captured as `ISSUE:…END_ISSUE` blocks in `ISSUES.md`. This replaces any standalone implementation plans or task trackers.
+All future work — features, bugs, refactors — must be captured as `ISSUE:…END_ISSUE` blocks in `TODO.md`. After syncing, the block is automatically removed from `TODO.md` to prevent duplicate uploads.
 
 ```
-1. Write the issue in ISSUES.md (Goal / Description / Requirements / Acceptance Criteria)
+1. Write the issue in TODO.md (Goal / Description / Requirements / Acceptance Criteria)
 2. Run `task sync` to push to GitHub and the @hello_architect project
 3. Label with `agent:dev` for automated execution, or work it manually
 ```

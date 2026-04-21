@@ -43,13 +43,13 @@ tasks:
       - docker compose -f docker-compose.dev.yml down
 
   sync:
-    desc: "Parse ISSUES.md and create GitHub Issues in the project"
+    desc: "Parse TODO.md and create GitHub Issues in the project; removes synced blocks from TODO.md"
     cmds:
       - powershell -ExecutionPolicy Bypass -File .github/scripts/sync-issues.ps1 -ProjectName "{{.GITHUB_PROJECT}}"
 
   sync:dry:
     internal: true
-    desc: "Dry run of issue sync — validates parsing without creating issues"
+    desc: "Dry run of issue sync — validates TODO.md parsing without creating issues"
     cmds:
       - powershell -ExecutionPolicy Bypass -File .github/scripts/sync-issues.ps1 -DryRun -ProjectName "{{.GITHUB_PROJECT}}"
 
