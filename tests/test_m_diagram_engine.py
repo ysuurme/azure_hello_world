@@ -1,3 +1,4 @@
+from unittest.mock import patch, MagicMock
 from src.utils.m_diagram_engine import DiagramEngine
 
 
@@ -7,8 +8,12 @@ class TestDiagramEngine:
         Tests that valid D2 syntax produces a valid SVG output.
         """
         engine = DiagramEngine()
-        d2_syntax = "direction: right; User -> Agent"
-        svg_bytes = engine.generate_svg(d2_syntax)
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = b'<svg xmlns="http://www.w3.org/2000/svg"><text>User</text><text>Agent</text></svg>'
+
+        with patch("src.utils.m_diagram_engine.subprocess.run", return_value=mock_result):
+            svg_bytes = engine.generate_svg("direction: right; User -> Agent")
 
         assert svg_bytes is not None
         assert b"<svg" in svg_bytes
