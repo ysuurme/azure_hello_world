@@ -75,6 +75,33 @@ class TestSingleModuleHandoff:
         assert isinstance(result, DispatchResult)
 
 
+class TestMultiTurnActiveModuleRouting:
+    def test_unknown_command_routes_to_active_module(self):
+        d = _make_dispatcher()
+        d._modules["/diagram"].handle = MagicMock(return_value=_mock_module_response("answer ok"))
+
+        prior = {"active_module": "/diagram", "module_state": {"/diagram": {"phase": "grilling"}}}
+        result = d.dispatch("I want API, Backend, Database", prior)
+        assert result.status == "completed"
+        assert result.response_text == "answer ok"
+
+    def test_unknown_command_with_no_active_module_returns_unknown(self):
+        d = _make_dispatcher()
+        result = d.dispatch("plain answer no module active", {})
+        assert result.status == "unknown_command"
+
+    def test_active_module_state_preserved_across_turns(self):
+        d = _make_dispatcher()
+        d._modules["/diagram"].handle = MagicMock(
+            return_value=_mock_module_response(state={"phase": "grilling", "step": 2})
+        )
+
+        prior = {"active_module": "/diagram", "module_state": {"/diagram": {"phase": "grilling"}}}
+        result = d.dispatch("my answer", prior)
+        assert result.updated_state["module_state"]["/diagram"]["phase"] == "grilling"
+        assert result.updated_state["module_state"]["/diagram"]["step"] == 2
+
+
 class TestExceptionIsolation:
     def test_module_exception_returns_error_status(self):
         d = _make_dispatcher()
