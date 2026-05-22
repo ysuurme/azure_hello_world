@@ -50,9 +50,7 @@ def test_adr_secrets_management_not_blocked() -> None:
         _DENYLIST_SNIPPET
         + "if (Test-SensitivePath 'docs/adr/ADR-008-secrets-management.md') { exit 1 } else { exit 0 }"
     )
-    assert result.returncode == 0, (
-        "docs/adr/ADR-008-secrets-management.md must NOT be blocked by the denylist"
-    )
+    assert result.returncode == 0, "docs/adr/ADR-008-secrets-management.md must NOT be blocked by the denylist"
 
 
 def test_adr_credential_doc_not_blocked() -> None:
@@ -60,49 +58,32 @@ def test_adr_credential_doc_not_blocked() -> None:
         _DENYLIST_SNIPPET
         + "if (Test-SensitivePath 'docs/adr/ADR-009-credential-rotation.md') { exit 1 } else { exit 0 }"
     )
-    assert result.returncode == 0, (
-        "ADR files matching *credential* under docs/adr/ must NOT be blocked by the denylist"
-    )
+    assert result.returncode == 0, "ADR files matching *credential* under docs/adr/ must NOT be blocked by the denylist"
 
 
 # ── Sensitive files that must be blocked ──────────────────────────────────────
 
 
 def test_key_file_is_blocked() -> None:
-    result = _ps(
-        _DENYLIST_SNIPPET
-        + "if (Test-SensitivePath 'private.key') { exit 0 } else { exit 1 }"
-    )
+    result = _ps(_DENYLIST_SNIPPET + "if (Test-SensitivePath 'private.key') { exit 0 } else { exit 1 }")
     assert result.returncode == 0, "*.key files must be blocked by the denylist"
 
 
 def test_pem_file_is_blocked() -> None:
-    result = _ps(
-        _DENYLIST_SNIPPET
-        + "if (Test-SensitivePath 'cert.pem') { exit 0 } else { exit 1 }"
-    )
+    result = _ps(_DENYLIST_SNIPPET + "if (Test-SensitivePath 'cert.pem') { exit 0 } else { exit 1 }")
     assert result.returncode == 0, "*.pem files must be blocked by the denylist"
 
 
 def test_pfx_file_is_blocked() -> None:
-    result = _ps(
-        _DENYLIST_SNIPPET
-        + "if (Test-SensitivePath 'cert.pfx') { exit 0 } else { exit 1 }"
-    )
+    result = _ps(_DENYLIST_SNIPPET + "if (Test-SensitivePath 'cert.pfx') { exit 0 } else { exit 1 }")
     assert result.returncode == 0, "*.pfx files must be blocked by the denylist"
 
 
 def test_secret_file_is_blocked() -> None:
-    result = _ps(
-        _DENYLIST_SNIPPET
-        + "if (Test-SensitivePath 'my-secret-file.txt') { exit 0 } else { exit 1 }"
-    )
+    result = _ps(_DENYLIST_SNIPPET + "if (Test-SensitivePath 'my-secret-file.txt') { exit 0 } else { exit 1 }")
     assert result.returncode == 0, "*secret* files must be blocked by the denylist"
 
 
 def test_credential_file_is_blocked() -> None:
-    result = _ps(
-        _DENYLIST_SNIPPET
-        + "if (Test-SensitivePath 'db-credentials.json') { exit 0 } else { exit 1 }"
-    )
+    result = _ps(_DENYLIST_SNIPPET + "if (Test-SensitivePath 'db-credentials.json') { exit 0 } else { exit 1 }")
     assert result.returncode == 0, "*credential* files must be blocked by the denylist"

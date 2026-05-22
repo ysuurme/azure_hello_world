@@ -1,7 +1,6 @@
 import subprocess
 import sys
 
-
 _PROMPT_TEMPLATE = """Generate a conventional commit message for the following diff.
 
 Rules:
@@ -18,9 +17,7 @@ DIFF:
 
 def _staged_diff() -> str:
     try:
-        result = subprocess.run(
-            ["git", "diff", "--staged"], capture_output=True, text=True, check=True
-        )
+        result = subprocess.run(["git", "diff", "--staged"], capture_output=True, text=True, check=True)
         return result.stdout
     except subprocess.CalledProcessError as e:
         print(f"Git error: {e.stderr.strip()}")
@@ -32,9 +29,7 @@ def _staged_diff() -> str:
 
 def _claude_cli(prompt: str) -> str | None:
     try:
-        result = subprocess.run(
-            ["claude", "-p", "-"], input=prompt, capture_output=True, text=True
-        )
+        result = subprocess.run(["claude", "-p", "-"], input=prompt, capture_output=True, text=True)
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
     except FileNotFoundError:

@@ -11,7 +11,6 @@ from src.tools.setup import (
     set_github_variable,
 )
 
-
 # --- load_answers ---
 
 
@@ -132,9 +131,7 @@ def test_prompt_for_answers_uses_default_for_empty_field_only() -> None:
 # --- main ---
 
 
-def test_main_uses_fallback_when_answers_file_missing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_main_uses_fallback_when_answers_file_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
 
     context_file = tmp_path / "CONTEXT.md"
@@ -159,9 +156,7 @@ def test_main_uses_fallback_when_answers_file_missing(
     mock_gh.assert_called_once_with("application")
 
 
-def test_main_replaces_sentinels_and_sets_github_var(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_main_replaces_sentinels_and_sets_github_var(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
 
     answers_file = tmp_path / ".copier-answers.yml"

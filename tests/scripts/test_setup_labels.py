@@ -123,6 +123,4 @@ def test_base_labels_colors_are_valid_hex() -> None:
         + "$invalid = @($BaseLabels | Where-Object { $_.Color -notmatch '^[0-9a-fA-F]{6}$' })\n"
         + "if ($invalid.Count -gt 0) { $invalid.Name -join ',' | Write-Host; exit 1 } else { exit 0 }"
     )
-    assert result.returncode == 0, (
-        f"Labels with invalid hex colors: {result.stdout.strip()}"
-    )
+    assert result.returncode == 0, f"Labels with invalid hex colors: {result.stdout.strip()}"

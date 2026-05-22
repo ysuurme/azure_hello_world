@@ -34,9 +34,7 @@ def test_generate_commit_message_falls_back_to_sdk() -> None:
 
 def test_generate_commit_message_cli_takes_priority_over_sdk() -> None:
     with patch("src.tools.commit._claude_cli", return_value="feat: from cli"):
-        with patch(
-            "src.tools.commit._claude_sdk", return_value="feat: from sdk"
-        ) as mock_sdk:
+        with patch("src.tools.commit._claude_sdk", return_value="feat: from sdk") as mock_sdk:
             result = generate_commit_message("diff")
 
     mock_sdk.assert_not_called()
@@ -147,9 +145,7 @@ def test_main_exits_when_no_staged_changes() -> None:
 
 def test_main_dry_run_skips_commit() -> None:
     with patch("src.tools.commit._staged_diff", return_value="some diff"):
-        with patch(
-            "src.tools.commit.generate_commit_message", return_value="feat: thing"
-        ):
+        with patch("src.tools.commit.generate_commit_message", return_value="feat: thing"):
             with patch("src.tools.commit._commit") as mock_commit:
                 with patch.object(sys, "argv", ["commit", "--dry-run"]):
                     main()
@@ -158,9 +154,7 @@ def test_main_dry_run_skips_commit() -> None:
 
 def test_main_commits_when_not_dry_run() -> None:
     with patch("src.tools.commit._staged_diff", return_value="some diff"):
-        with patch(
-            "src.tools.commit.generate_commit_message", return_value="feat: thing"
-        ):
+        with patch("src.tools.commit.generate_commit_message", return_value="feat: thing"):
             with patch("src.tools.commit._commit") as mock_commit:
                 with patch.object(sys, "argv", ["commit"]):
                     main()

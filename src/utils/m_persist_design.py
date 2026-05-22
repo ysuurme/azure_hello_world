@@ -26,7 +26,7 @@ class ArchitecturePersister:
         project_dir = os.path.join(self.save_path, f"{safe_name}_{timestamp}")
 
         os.makedirs(project_dir, exist_ok=True)
-        f_log(f"Archiving generated solution to {project_dir}", c_type="process")
+        f_log(f"Archiving generated solution to {project_dir}", level="process")
 
         # Save Markdown payload
         with open(os.path.join(project_dir, "architecture.md"), "w", encoding="utf-8") as f:
@@ -37,5 +37,5 @@ class ArchitecturePersister:
             with open(os.path.join(project_dir, "diagram.svg"), "wb") as f:
                 f.write(svg_bytes)
 
-        f_log("Archival sequence successful.", c_type="success")
+        f_log("Archival sequence successful.", level="success")
         return project_dir

@@ -6,8 +6,14 @@ class TestUITopology:
     @pytest.fixture
     def app_test(self):
         """Initializes the Streamlit AppTest framework for Headless UI validation."""
-        at = AppTest.from_file("src/ui/app.py")
-        return at
+        from unittest.mock import patch
+
+        # Mock orchestrator to prevent real LLM network calls in tests
+        with patch(
+            "src.utils.m_orchestrator.AgenticOrchestrator.orchestrate_cycle", return_value=({}, "Mocked response")
+        ):
+            at = AppTest.from_file("src/ui/app.py")
+            yield at
 
     def test_app_instantiation_and_layout(self, app_test):
         """

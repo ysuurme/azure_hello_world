@@ -16,21 +16,15 @@ def test_dockerignore_exists() -> None:
 
 
 def test_dockerfile_no_pip() -> None:
-    assert "pip install" not in DOCKERFILE.read_text(), (
-        "Dockerfile must not contain 'pip install'"
-    )
+    assert "pip install" not in DOCKERFILE.read_text(), "Dockerfile must not contain 'pip install'"
 
 
 def test_dockerfile_no_jinja2() -> None:
-    assert "{{" not in DOCKERFILE.read_text(), (
-        "Dockerfile must not contain Jinja2 syntax"
-    )
+    assert "{{" not in DOCKERFILE.read_text(), "Dockerfile must not contain Jinja2 syntax"
 
 
 def test_dockerignore_no_jinja2() -> None:
-    assert "{{" not in DOCKERIGNORE.read_text(), (
-        ".dockerignore must not contain Jinja2 syntax"
-    )
+    assert "{{" not in DOCKERIGNORE.read_text(), ".dockerignore must not contain Jinja2 syntax"
 
 
 def test_dockerfile_two_stage_build() -> None:
@@ -66,12 +60,8 @@ def test_dockerignore_excludes_venv_and_env() -> None:
 
 
 def test_dockerfile_python313_builder() -> None:
-    assert "python3.13-bookworm" in DOCKERFILE.read_text(), (
-        "Dockerfile builder stage must use python3.13-bookworm"
-    )
+    assert "python3.13-bookworm" in DOCKERFILE.read_text(), "Dockerfile builder stage must use python3.13-bookworm"
 
 
 def test_dockerfile_python313_runtime() -> None:
-    assert "python:3.13" in DOCKERFILE.read_text(), (
-        "Dockerfile runtime stage must use python:3.13"
-    )
+    assert "python:3.13" in DOCKERFILE.read_text(), "Dockerfile runtime stage must use python:3.13"

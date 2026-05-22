@@ -50,20 +50,20 @@ class _AuthManager:
                     _val = os.getenv(_v)
                     if _val is not None and _val.strip() == "":
                         os.environ.pop(_v, None)
-                        f_log(f"Removed empty env var {_v} to allow DefaultAzureCredential fallback.", c_type="debug")
+                        f_log(f"Removed empty env var {_v} to allow DefaultAzureCredential fallback.", level="debug")
 
             # Import here to allow tests to monkeypatch azure.identity.DefaultAzureCredential
             from azure.identity import DefaultAzureCredential
 
             cred = DefaultAzureCredential()
-            f_log("Created DefaultAzureCredential.", c_type="debug")
+            f_log("Created DefaultAzureCredential.", level="debug")
             self._cached_credential = cred
             return cred
         except ClientAuthenticationError as e:
-            f_log(f"Azure authentication failed: {e}", c_type="error")
+            f_log(f"Azure authentication failed: {e}", level="error")
             raise
         except Exception as e:
-            f_log(f"Unexpected error creating Azure credential: {e}", c_type="error")
+            f_log(f"Unexpected error creating Azure credential: {e}", level="error")
             raise
 
 
@@ -97,7 +97,7 @@ class ClientManager:
         if _cached_aiproject_client is not None:
             return _cached_aiproject_client
 
-        f_log("Initializing Azure credential for AIProjectClient.", c_type="process")
+        f_log("Initializing Azure credential for AIProjectClient.", level="process")
         cred = self.get_credential()
 
         try:
@@ -115,10 +115,10 @@ class ClientManager:
 
             client = projects.AIProjectClient(endpoint=clean_endpoint, credential=cred)
             _cached_aiproject_client = client
-            f_log("AIProjectClient initialized.", c_type="success")
+            f_log("AIProjectClient initialized.", level="success")
             return client
         except Exception as e:
-            f_log(f"Failed to initialize AIProjectClient: {e}", c_type="error")
+            f_log(f"Failed to initialize AIProjectClient: {e}", level="error")
             raise
 
     def get_openai_client(self):

@@ -10,10 +10,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
-      - uses: arduino/setup-task@v2
       - name: Install dependencies
-        run: task install
+        run: uv sync
       - name: Lint
-        run: task lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
       - name: Test
-        run: task test
+        run: uv run pytest -n auto --cov=src --cov-report=term-missing --cov-fail-under=80
