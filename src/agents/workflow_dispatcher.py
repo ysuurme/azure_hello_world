@@ -26,18 +26,51 @@ class WorkflowDispatcher:
     def dispatch(self, user_input: str, session_state: dict) -> DispatchResult:
         command = user_input.split()[0].lower()
 
-        if command not in self._modules:
-            return self._route_to_active_or_unknown(command, user_input, session_state)
+        if command == "/help":
+            return self._handle_help(session_state)
+        if command == "/exit":
+            return self._clear_active_module(session_state)
+        if command in self._modules:
+            return self._invoke_module(command, user_input, session_state)
+        if command.startswith("/"):
+            return self._handle_unknown_command(command, session_state)
 
-        return self._invoke_module(command, user_input, session_state)
-
-    def _route_to_active_or_unknown(self, command: str, user_input: str, session_state: dict) -> DispatchResult:
         active = session_state.get("active_module")
         if active and active in self._modules:
             return self._invoke_module(active, user_input, session_state)
-        known = ", ".join(self._modules.keys())
         return DispatchResult(
-            response_text=f"Unknown command `{command}`. Available: {known}.",
+            response_text=self._build_help_table(),
+            updated_state=session_state,
+            status="unknown_command",
+        )
+
+    def _build_help_table(self) -> str:
+        rows = ["| Slash Command | Module | Description |", "|---|---|---|"]
+        for cmd, module in self._modules.items():
+            name = getattr(module, "name", cmd)
+            desc = getattr(module, "description", "")
+            rows.append(f"| `{cmd}` | {name} | {desc} |")
+        return "\n".join(rows)
+
+    def _handle_help(self, session_state: dict) -> DispatchResult:
+        return DispatchResult(
+            response_text=self._build_help_table(),
+            updated_state=session_state,
+            status="completed",
+        )
+
+    def _clear_active_module(self, session_state: dict) -> DispatchResult:
+        updated = dict(session_state)
+        active = updated.pop("active_module", None)
+        if active and "module_state" in updated:
+            updated["module_state"] = dict(updated["module_state"])
+            updated["module_state"].pop(active, None)
+        msg = "Session cleared. Type `/help` to see available commands." if active else "No active module to exit."
+        return DispatchResult(response_text=msg, updated_state=updated, status="completed")
+
+    def _handle_unknown_command(self, command: str, session_state: dict) -> DispatchResult:
+        return DispatchResult(
+            response_text=f"Unknown command: `{command}`.\n\n{self._build_help_table()}",
             updated_state=session_state,
             status="unknown_command",
         )

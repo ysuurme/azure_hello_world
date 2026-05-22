@@ -102,6 +102,34 @@ class TestMultiTurnActiveModuleRouting:
         assert result.updated_state["module_state"]["/diagram"]["step"] == 2
 
 
+class TestMetaCommands:
+    def test_help_returns_markdown_table_with_all_modules(self):
+        d = _make_dispatcher()
+        result = d.dispatch("/help", {})
+        assert result.status == "completed"
+        assert "Slash Command" in result.response_text
+        assert "/diagram" in result.response_text
+
+    def test_exit_clears_active_module_and_module_state(self):
+        d = _make_dispatcher()
+        prior = {
+            "active_module": "/diagram",
+            "module_state": {"/diagram": {"phase": "grilling"}},
+        }
+        result = d.dispatch("/exit", prior)
+        assert result.status == "completed"
+        assert "active_module" not in result.updated_state
+        assert "/diagram" not in result.updated_state.get("module_state", {})
+
+    def test_unknown_slash_command_prepends_unknown_prefix_and_shows_help(self):
+        d = _make_dispatcher()
+        result = d.dispatch("/dgram", {})
+        assert result.status == "unknown_command"
+        assert "Unknown command" in result.response_text
+        assert "/dgram" in result.response_text
+        assert "/diagram" in result.response_text
+
+
 class TestExceptionIsolation:
     def test_module_exception_returns_error_status(self):
         d = _make_dispatcher()

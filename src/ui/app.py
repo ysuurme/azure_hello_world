@@ -91,7 +91,7 @@ st.set_page_config(page_title="Azure Architecture Agent", layout="wide")
 st.title("Architecture Agent 🛡️")
 st.markdown("### Technical Design Authority Agent")
 
-WELCOME_MESSAGE = "Welcome. Please describe the architecture you want to build."
+WELCOME_MESSAGE = "Welcome. Type `/help` to see available commands, or describe the architecture you want to build."
 
 # Session state initialization
 if "maf_state" not in st.session_state:
