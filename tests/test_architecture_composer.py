@@ -5,9 +5,8 @@ from src.utils.m_ai_client import ClientManager
 
 
 class TestArchitectureComposerAgent:
-
-    @patch('src.agents.architecture_composer.calculate_cost')
-    @patch('src.utils.m_ai_client.ClientManager.get_openai_client')
+    @patch("src.agents.architecture_composer.calculate_cost")
+    @patch("src.utils.m_ai_client.ClientManager.get_openai_client")
     def test_local_composer_generation(self, mock_openai_cm, mock_cost):
         """
         Tests the local generation path by bypassing actual LLM connection.
@@ -27,9 +26,12 @@ class TestArchitectureComposerAgent:
                             "objective: Enterprise B2B API\n\n"
                             "## b. Decisions"
                         )
+
                     message = Message()
+
                 class Resp:
                     choices = [Choice()]
+
                 return Resp()
 
         # Build a context manager mock that returns an object with responses.create
@@ -46,9 +48,13 @@ class TestArchitectureComposerAgent:
                                         "objective: Enterprise B2B API\n\n"
                                         "## b. Decisions"
                                     )
+
                                 return Resp()
+
                         self.responses = Responses()
+
                 return OpenAIClient()
+
             def __exit__(self, exc_type, exc, tb):
                 return False
 
@@ -62,15 +68,15 @@ class TestArchitectureComposerAgent:
         assert "Enterprise B2B API" in result_markdown
         assert "# Proposed Solution Architecture" in result_markdown
         assert "b. Decisions" in result_markdown
-        
-    @patch('src.agents.architecture_composer.calculate_cost')
-    @patch('src.utils.m_ai_client.ClientManager.get_openai_client')
+
+    @patch("src.agents.architecture_composer.calculate_cost")
+    @patch("src.utils.m_ai_client.ClientManager.get_openai_client")
     def test_live_llm_inference_call(self, mock_openai_cm, mock_cost):
         """
         Simulates the Azure AI inference payload to ensure structurally correct parsing.
         """
         mock_cost.return_value = {"mock": "cost"}
-        
+
         # Simulate Azure AI response choices
         mock_response = MagicMock()
         mock_choice = MagicMock()
@@ -78,7 +84,7 @@ class TestArchitectureComposerAgent:
         mock_response.choices = [mock_choice]
         # Ensure responses.create path returns output_text for the new OpenAI surface
         mock_response.output_text = mock_choice.message.content
-        
+
         # Create a context manager yielding an object with responses.create() returning mock_response-like output
         class CM2:
             def __enter__(self):
@@ -87,8 +93,11 @@ class TestArchitectureComposerAgent:
                         class Responses:
                             def create(self, model, input):
                                 return mock_response
+
                         self.responses = Responses()
+
                 return OpenAIClient()
+
             def __exit__(self, exc_type, exc, tb):
                 return False
 

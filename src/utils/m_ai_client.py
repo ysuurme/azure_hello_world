@@ -110,9 +110,9 @@ class ClientManager:
                     if part.strip().startswith("endpoint="):
                         clean_endpoint = part.split("=", 1)[1].strip()
                         break
-            
+
             clean_endpoint = clean_endpoint.replace("endpoint=", "").strip()
-            
+
             client = projects.AIProjectClient(endpoint=clean_endpoint, credential=cred)
             _cached_aiproject_client = client
             f_log("AIProjectClient initialized.", c_type="success")
@@ -136,7 +136,6 @@ class ClientManager:
         get_client = getattr(aiproject, "get_openai_client", None)
         if not callable(get_client):
             raise RuntimeError(
-                "AIProjectClient does not expose 'get_openai_client' "
-                "— update SDK or use a different surface"
+                "AIProjectClient does not expose 'get_openai_client' — update SDK or use a different surface"
             )
         return get_client()

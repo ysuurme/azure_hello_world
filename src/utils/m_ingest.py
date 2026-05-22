@@ -9,6 +9,7 @@ class IngestionPipeline:
     Ingestion logic enforcing Idempotency and Azure Document Intelligence.
     Focuses on 'Document-Aware Recursive Chunking'.
     """
+
     def __init__(self, search_client: Any) -> None:
         self.search_client = search_client
         # In Phase 1 we use local stubs. Phase 2 connects this to the Azure service.
@@ -29,10 +30,10 @@ class IngestionPipeline:
             # Mock Search query for existing document metadata
             # existing_doc = self.search_client.get_document(key=doc_id)
             # return existing_doc.get("content_hash") != current_hash
-            return True # Always update in mock Phase 1
+            return True  # Always update in mock Phase 1
         except Exception:
-             # Document doesn't exist yet
-             return True
+            # Document doesn't exist yet
+            return True
 
     def extract_with_document_intelligence(self, file_path: str) -> str:
         """

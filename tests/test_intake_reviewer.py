@@ -5,16 +5,14 @@ from src.utils.m_ai_client import ClientManager
 
 
 class TestIntakeReviewerAgent:
-    
-    @patch('src.utils.m_ai_client.ClientManager.get_openai_client')
+    @patch("src.utils.m_ai_client.ClientManager.get_openai_client")
     def test_mocked_insufficient_prompt(self, mock_openai_cm):
         """Verify that the agent calls the live chat client and parses a 'needs_clarification' response."""
         # Simulate chat client returning a JSON payload indicating clarification needed
         mock_response = type("R", (), {})()
         mock_choice = type("C", (), {})()
         clarification_json = (
-            '{"status": "needs_clarification", '
-            '"questions": ["Please provide more details on workload."]}'
+            '{"status": "needs_clarification", "questions": ["Please provide more details on workload."]}'
         )
         mock_choice.message = type("M", (), {"content": clarification_json})
         mock_response.choices = [mock_choice]
@@ -27,10 +25,14 @@ class TestIntakeReviewerAgent:
                         class Responses:
                             def create(self, model, input):
                                 return type("Resp", (), {"output_text": mock_choice.message.content})()
+
                         self.responses = Responses()
+
                 return OpenAIClient()
+
             def __exit__(self, exc_type, exc, tb):
                 return False
+
         mock_openai_cm.return_value = CM()
 
         agent = IntakeReviewerAgent(client_manager=ClientManager())
@@ -38,7 +40,7 @@ class TestIntakeReviewerAgent:
         assert response.get("status") == "needs_clarification"
         assert "questions" in response
 
-    @patch('src.utils.m_ai_client.ClientManager.get_openai_client')
+    @patch("src.utils.m_ai_client.ClientManager.get_openai_client")
     def test_mocked_sufficient_prompt(self, mock_openai_cm):
         """Verify that the agent calls the live chat client and parses a 'ready' response."""
         mock_response = type("R", (), {})()
@@ -53,10 +55,14 @@ class TestIntakeReviewerAgent:
                         class Responses:
                             def create(self, model, input):
                                 return type("Resp", (), {"output_text": mock_choice.message.content})()
+
                         self.responses = Responses()
+
                 return OpenAIClient()
+
             def __exit__(self, exc_type, exc, tb):
                 return False
+
         mock_openai_cm.return_value = CM2()
 
         agent = IntakeReviewerAgent(client_manager=ClientManager())

@@ -1,4 +1,3 @@
-
 import pytest
 
 from src.agents.architecture_composer import ArchitectureComposerAgent
@@ -18,9 +17,12 @@ class MockAIProjectClient:
             class Choice:
                 class Message:
                     content = "Mocked architecture response"
+
                 message = Message()
+
             class Response:
                 choices = [Choice()]
+
             return Response()
 
 
@@ -44,15 +46,19 @@ def test_get_foundry_client_missing(monkeypatch):
 
 def test_architecture_composer_fallback(monkeypatch):
     """When a chat client is available the composer should use it to generate markdown."""
+
     # Provide a mock chat client exposing `complete(...)` returning a response object
     class MockChat:
         def complete(self, *args, **kwargs):
             class Choice:
                 class Message:
                     content = "# Proposed Solution Architecture\n\n## a. Purpose\nMocked"
+
                 message = Message()
+
             class Resp:
                 choices = [Choice()]
+
             return Resp()
 
     # Patch the ClientManager to return a context manager exposing `responses.create`
@@ -64,9 +70,13 @@ def test_architecture_composer_fallback(monkeypatch):
                         def create(self, model, input):
                             class Resp:
                                 output_text = "# Proposed Solution Architecture\n\n## a. Purpose\nMocked"
+
                             return Resp()
+
                     self.responses = Responses()
+
             return C()
+
         def __exit__(self, exc_type, exc, tb):
             return False
 
@@ -80,8 +90,10 @@ def test_architecture_composer_fallback(monkeypatch):
 
 def _build_mock_openai_cm(output_text: str):
     """Build a mock context manager mimicking ClientManager.get_openai_client()."""
+
     class MockResponse:
         pass
+
     MockResponse.output_text = output_text
 
     class MockResponses:
@@ -95,6 +107,7 @@ def _build_mock_openai_cm(output_text: str):
     class MockCM:
         def __enter__(self):
             return MockClient()
+
         def __exit__(self, exc_type, exc, tb):
             return False
 
@@ -103,10 +116,7 @@ def _build_mock_openai_cm(output_text: str):
 
 def test_intake_reviewer_fallback(monkeypatch):
     """When a chat client is available the intake reviewer should parse chat responses."""
-    short_json = (
-        '{"status": "needs_clarification", '
-        '"questions": ["Please provide more details on workload."]}'
-    )
+    short_json = '{"status": "needs_clarification", "questions": ["Please provide more details on workload."]}'
     long_json = '{"status": "ready", "requirements": {"objective": "Demo"}}'
 
     # First test short prompt
@@ -125,10 +135,7 @@ def test_intake_reviewer_fallback(monkeypatch):
         lambda self: _build_mock_openai_cm(long_json),
     )
     reviewer = IntakeReviewerAgent(client_manager=ClientManager())
-    long_prompt = (
-        "This is a sufficiently long prompt describing "
-        "the workload and constraints"
-    )
+    long_prompt = "This is a sufficiently long prompt describing the workload and constraints"
     result = reviewer.review_input(long_prompt)
     assert result["status"] == "ready"
     assert isinstance(result.get("requirements"), dict)
