@@ -33,6 +33,10 @@ build/
 logs/
 designs/
 
+# Agent planning artifacts (ephemeral, auto-generated)
+.planning/
+docs/CODEBASE_MAP.md
+
 # Linting & Testing
 .ruff_cache/
 .coverage
