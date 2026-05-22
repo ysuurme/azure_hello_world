@@ -1,84 +1,94 @@
-# AGENTS.md — Agent Standing Instructions
+# AGENTS.md — Agent Standing Instructions & Project Context
 
-> **Governance:** Comprehensive ruleset and standing instructions for any agent interacting with this repository. Coding enforcement protocols are explicitly detailed in [`.agents/skills/`](.agents/skills/).
+> **Governance:** Comprehensive ruleset and standing instructions for any agent interacting with this repository. Coding enforcement protocols are explicitly detailed in `.agents/skills/`.
 
-## Agentic Development
+## Project Identity
 
-The `agent-listener.ps1` polls for `agent:dev`-labeled issues. Phase A refines raw issues into structured format. Phase B runs Gemini CLI (`task agent:dev ISSUE=N`) to implement. Labels track state: `agent:dev` → `agent:implementing` → `agent:review` → `agent:merged`. All PRs route to the `@hello_architect` project for human review.
+| Key | Value |
+|-----|-------|
+| Stack | Python + UV |
+| Entry point | `src/main.py` |
+| Config | `src/config.py` (pydantic-settings, loads `.env`) |
+
+## Session Initialisation
+
+Load in this order at the start of every session:
+
+1. `CONTEXT.md` — domain glossary, bounded contexts, Module Map, Issue-Type Index, and architectural constraints
+2. `AGENTS.md` — this file; standing instructions and skill index
+3. `docs/adr/ADR_STRUCTURE.md` — master ADR index; filter by `applies_to` for the current `project_type` and load only the relevant ADR files
+4. Task-specific context — issue description, PR diff, or user prompt
+
+Never begin a task without reading `CONTEXT.md` first. An agent that skips this will hallucinate boundaries. 
+After reading `ADR_STRUCTURE.md`, load only the ADRs that match the current `project_type` (default: application - ADR-003, ADR-004, ADR-007, ADR-008, ADR-009). Do not load ADRs scoped to other project types.
+
+### Context Protocol
+
+Mandatory before opening any source file. See ADR-009.
+1. Read `CONTEXT.md` fully. Do not open any `.py` / `.ps1` / `.yml` file yet.
+2. From the Module Map and Issue-Type Index, identify the 3–5 files relevant to this task. Write them down explicitly in your first user-facing message before reading them.
+3. Read only those files. If you feel the urge to read more, ask: *does CONTEXT.md tell me this file is in scope for this issue type?* If no — stop. Work with what you have.
+4. If implementation reveals a dependency not on the Map, read that file, and update the Module Map in `CONTEXT.md` in the same PR.
+5. Never `Grep` `**/*.py` to orient yourself. Keep the Map accurate.
+
+## Agentic Development Workflow
+
+The `agent-listener.ps1` polls for `agent:dev`-labeled issues. Phase A refines raw issues into structured format. Phase B runs the agent CLI (`task start ISSUE=N`) to implement. Labels track state: `agent:dev` → `agent:implementing` → `agent:review` → `agent:merged`. All PRs route to the `@hello_architect` project for human review.
+
+### Skills
+
+Invoke the relevant skill in `.agents/skills/` before implementing manually.
+- **Workflow:** `refine` → `architecture` → `plan` → `tdd` → `harness` → `review` → `ship`
+- **Meta:** `version-control`, `write-skills`
+- **Domain:** `application-engineering` (AI-backed APIs), `data-engineering`, `agentic-engineering`. Load exactly one domain skill per session.
+
+## Repository Layout
+
+| Path | Purpose |
+|------|---------|
+| `src/main.py` | Entry point |
+| `src/config.py` | Centralised config (loads `.env`) |
+| `src/utils/` | Generic transferable modules (`m_*.py`) |
+| `src/<domain>/` | Domain-specific logic |
+| `src/tools/` | Developer utilities |
+| `tests/` | Pytest suite, mirrors `src/` and `tools/` hierarchy |
+| `.agents/skills/` | Skill system instructions |
+| `docs/adr/` | Architecture Decision Records |
+| `CONTEXT.md` | Repo-structure doc — domain glossary, Module Map, architectural constraints |
+| `.github/workflows/` | CI: lint + test |
 
 ## Rules
 
-1. **Every PR must include a test file** in `/tests`.
-2. **Check `Taskfile.yml` first** before writing new scripts. `task --list` to discover.
-3. **No hardcoded API keys.** All Azure connections use `DefaultAzureCredential`.
-4. **UV is the package manager.** `uv add`, `uv sync`, `uv run` — never `pip install`.
-5. **Code geometry** enforced via `.agents/skills/review-code`: <30-line functions, 2-level indent max, type hints, guard clauses.
-6. **Standard Library First.** Prefer builtins and stdlib over third-party packages.
-7. **Git operations** follow `.agents/skills/git-workflow`: `feature/issue-N` branches, conventional commits, agent self-review, no auto-merge.
-8. **Lint must pass** before any commit: `task lint` (ruff with E, F, I, N, UP rules).
-
-## Tooling Policy
-
-- **Primary Tool:** You MUST use `run_shell_command` or similar capability limits for all environment interactions.
-- **Allowed Binaries:** `gh`, `task`, `ruff`, `git`.
-- **Constraint:** Do not use raw `pip`, `npm`, or `rm -rf`; always use the project `task` runner or native operations to ensure state protection.
+1. **UV only.** `uv add`, `uv sync`, `uv run` — never `pip install`.
+2. **No hardcoded secrets.** All Azure connections use `DefaultAzureCredential`. All config via `.env` + `src/config.py`.
+3. **Test parity.** Every `src/**/*.py` and `tools/*.py` must have a matching test file in `/tests`.
+4. **Lint must pass.** `uv run ruff check` + `uv run ruff format --check` before commit.
+5. **Code geometry.** <30-line functions, 2-level indent max, type hints, guard clauses (`.agents/skills/review-code`).
+6. **Standard library first.** Prefer stdlib over third-party packages. Keep `src/utils/` generic (`m_*.py`).
+7. **Never modify `AGENTS.md` or `CONTEXT.md` during implementation.** Changes go through a `refine` session. *Exception*: Updating the Module Map and Issue-Type Index mid-implementation when a new file/domain is discovered.
+8. **Git operations.** Use `feature/issue-N` branches, conventional commits, no auto-merge (`.agents/skills/git-workflow`).
+9. **Sizing and Priority.** Fibonacci estimate anchor, scale, and priority definitions are defined in the `ISSUES.md` header.
 
 ## Model Delegation & Handoff Rules (MANDATORY)
 
-The active driver is set via `AGENT_DRIVER` in `.env` (`gemini` or `claude`). Both drivers share the same delegation principle: the cloud model reasons and plans; the local model generates code.
+The active driver is set via `AGENT_DRIVER` in `.env` (`gemini` or `claude`).
+- **Cloud Model (Gemini/Claude):** Architecture, planning, complex reasoning, multi-step decision-making, web research, code review analysis, multi-file refactors.
+- **Local Model (GPU-resident, LM Studio):** ALL routine code generation, file writing/editing, refactoring, boilerplate, test scaffolding.
 
-### Role Definitions
-- **Cloud Model (Gemini or Claude, per `AGENT_DRIVER`):** Architecture, planning, complex reasoning, multi-step decision-making, web research, code review analysis.
-- **Local Model (GPU-resident, via LM Studio):** ALL routine code generation, file writing, file editing, refactoring, boilerplate, test scaffolding.
+### Driver Mechanisms
+- **Gemini:** Uses the `lm-local` MCP server (port 3100) for routine work (`mcp_lm-local_*` tools).
+- **Claude:** Uses HTTP call to LM Studio (`uv run python .github/scripts/local_lm_coder.py`).
 
-### Decision Heuristic (applies to both drivers)
-- **One sentence to describe the change** → delegate to local model.
-- **Multi-step reasoning or cross-file coordination required** → use cloud model tools directly.
+## Safety & Boundaries
 
-**Delegate to local model for:** new files, single-file edits, test files, config files, boilerplate, small refactors.
-**Keep in cloud model for:** multi-file coordinated refactors, security-critical code (auth, credentials, encryption), fixing local model errors, files >200 lines requiring coherence.
-
-### Gemini Driver — MCP-First Enforcement
-
-When `AGENT_DRIVER=gemini`, the `lm-local` MCP server (bridge on port 3100) is the delegation mechanism. Default to it for all routine code-writing operations.
-
-**Use `mcp_lm-local_*` tools for all routine work.** Available tools: `write_file`, `read_file`, `replace`, `glob`, `list_directory`, `read_many_files`, `search_file_content`, `google_web_search`, `web_fetch`.
-
-If `lm-local` is disconnected, fall back to cloud model file tools and log the fallback in the issue comments.
-
-### Claude Driver — Local LM via HTTP
-
-When `AGENT_DRIVER=claude`, delegation uses a direct HTTP call to LM Studio's Anthropic-compatible endpoint. No MCP bridge is involved.
-
-For all routine code generation, call:
-```bash
-uv run python .github/scripts/local_lm_coder.py \
-  --task "precise description of what to generate" \
-  --context "$(cat path/to/relevant/file.py)"
-```
-Capture stdout and write it to the target file using Write/Edit tools. Do not generate code directly when this rule applies.
-
-Allowed shell commands: `gh`, `task`, `git`, `ruff`, `uv run`, `lms` — see `.claude/settings.json`.
-
-### Cloud Model — Permitted Uses (both drivers)
-1. **Planning**: Deciding what to build, reading issues, analyzing requirements.
-2. **Architecture**: Designing module boundaries, data flow, API contracts.
-3. **Research**: Web search and page fetching for documentation and APIs.
-4. **Complex Reasoning**: Debugging multi-file interactions, resolving ambiguous requirements.
-5. **Shell Commands**: Running `gh`, `task`, `git`, `ruff`.
-6. **Code Review**: Analyzing diffs, posting PR review comments.
-7. **Complex Code**: Multi-file refactors, security-critical implementations, correcting local model errors.
-
-## Safety & Boundaries (CRITICAL for Headless Agents)
-
-- **STRICT PROJECT ROOT BOUNDARY:** You must NEVER modify any files, or run any commands that affect files, outside of this project root directory.
-- **SYSTEM HARM:** When in doubt, do NOT run any commands that could potentially harm the host system. Fall back to safely failing the task.
-- **NO DESTRUCTIVE GLOBAL COMMANDS:** Global state changes (e.g., modifying global Git configs, installing global software) are strictly prohibited.
-- **VERSION CONTROL FREEDOM:** Because the project is under Git version control and the listener orchestrates feature branches, you are free to heavily modify, refactor, and create files *within* the project root. Git provides the safety net.
+- **STRICT PROJECT ROOT BOUNDARY:** Never modify files or run commands that affect files outside this project root directory.
+- **SYSTEM HARM:** When in doubt, do NOT run commands that could potentially harm the host system. Fall back to safely failing.
+- **NO DESTRUCTIVE GLOBAL COMMANDS:** Global state changes are strictly prohibited.
+- **Tooling Policy:** Allowed shell commands: `gh`, `task`, `git`, `ruff`, `uv run`.
 
 ## Personal Learning Goals
 
-1. **Master Agentic Workflows**: Move past functional programming toward building non-deterministic, reasoning-based AI systems via Azure AI Foundry.
-2. **Understanding Context-Aware Search**: Move past basic RAG into multi-query planning. Use Semantic Rankers alongside Hybrid Vector/BM25 retrievals via Azure AI Search (`knowledge_base_retrieve`).
-3. **IaC and Managed Identities**: Deepen proficiency with Terraform, specifically configuring connections governed by Entra ID (`authType = "ProjectManagedIdentity"`) and understanding underlying requirements like the `capability_host` for AI Hub execution.
-4. **Agent Observability**: Track AI reasoning traces using Azure Application Insights explicitly layered onto Foundry Agent Services.
+1. **Master Agentic Workflows**: Build non-deterministic, reasoning-based AI systems via Azure AI Foundry.
+2. **Context-Aware Search**: Move past basic RAG into multi-query planning via Azure AI Search (`knowledge_base_retrieve`).
+3. **IaC and Managed Identities**: Deepen proficiency with Terraform and Entra ID (`authType = "ProjectManagedIdentity"`).
+4. **Agent Observability**: Track AI reasoning traces using Azure Application Insights.
