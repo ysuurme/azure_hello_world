@@ -38,8 +38,11 @@ with st.sidebar:
 for idx, msg in enumerate(st.session_state.chat_history):
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
-        if msg["type"] == "architecture" and msg.get("svg"):
-            st.image(base64.b64decode(msg["svg"]))
+        if msg["type"] == "architecture":
+            if msg.get("svg"):
+                st.image(base64.b64decode(msg["svg"]))
+            elif msg.get("d2_syntax"):
+                st.error("D2 Compilation Failed. The raw syntax is preserved in the markdown above.")
 
 # Main chat interface for iteration
 query = st.chat_input("Describe your architecture or answer the clarifying questions...")
@@ -90,13 +93,22 @@ if query:
             # Formulate the AI's response format
             msg_type = "architecture" if updated_state.get("phase") == "GENERATION" else "text"
 
-            ai_msg = {"role": "assistant", "type": msg_type, "content": output_text, "svg": svg_b64}
+            ai_msg = {
+                "role": "assistant", 
+                "type": msg_type, 
+                "content": output_text, 
+                "svg": svg_b64,
+                "d2_syntax": d2_syntax if 'd2_syntax' in locals() else None
+            }
             st.session_state.chat_history.append(ai_msg)
 
             with st.chat_message("assistant"):
                 st.markdown(output_text)
-                if svg_b64:
-                    st.image(base64.b64decode(svg_b64))
+                if msg_type == "architecture":
+                    if svg_b64:
+                        st.image(base64.b64decode(svg_b64))
+                    elif 'd2_syntax' in locals() and d2_syntax:
+                        st.error("D2 Compilation Failed. The raw syntax is preserved in the markdown above.")
 
         except Exception as e:
             f_log(f"Execution Error: {e}", c_type="error")

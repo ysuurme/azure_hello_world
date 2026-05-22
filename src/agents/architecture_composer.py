@@ -7,6 +7,7 @@ from src.config import AGENT_MODELS
 from src.utils.m_log import f_log
 
 # Use Foundry/OpenAI-style responses client via AIProjectClient.get_openai_client()
+from src.utils.m_search import knowledge_base_retrieve
 from src.utils.m_tools import calculate_cost
 
 
@@ -32,19 +33,30 @@ class ArchitectureComposerAgent:
             "d. Rationale for selecting the solution architecture in b.\n"
             "e. Implementation guidelines containing any relevant details\n\n"
             "After the markdown, you MUST include a D2 diagram syntax block wrapped in ```d2 ... ``` "
-            "that visualizes the architecture components and their relationships."
+            "that visualizes the architecture components and their relationships.\n\n"
+            "### STRICT D2 SCHEMA RULES\n"
+            "To prevent compilation errors and adhere to Hexagonal/Clean Architecture, follow these syntactical rules:\n"
+            "1. Define components strictly with `shape` attributes (e.g., `component: {shape: cylinder}`). Do NOT use unsupported HTML tags.\n"
+            "2. Ensure all components are grouped logically into Bounded Contexts or Hexagonal layers (e.g., `Core Domain`, `Adapters`, `Infrastructure`).\n"
+            "3. Use `direction: right` or `direction: down` at the top of the diagram for consistent flow.\n"
+            "4. Enforce Hexagonal Architecture flow: External Triggers -> Application Adapters -> Domain Core. Dependency arrows (`->`) MUST point inwards.\n"
+            "5. Apply standard colors/classes to indicate Azure components vs Core Logic where appropriate.\n"
+            "6. Always include `classes: { ... }` or `theme: sketch` to style the diagram safely without raw CSS.\n"
+            "If you fail to follow valid D2 syntax, the UI will crash. Use simple, robust node declarations."
         )
 
     def _retrieve_capabilities(self, requirements: dict[str, Any]) -> list[dict[str, str]]:
         """
-        Mock Hybrid/Semantic Search over the capabilities Markdown files in Azure AI Search.
+        Context-Aware Search over the capabilities Markdown files.
         """
-        f_log(f"Retrieving capabilities for constraints: {requirements.get('constraints')}", c_type="process")
-        # In reality, this queries `src.utils.m_search.knowledge_base_retrieve`
-        return [
-            {"technology": "Azure Container Apps", "reason": "Serverless scale-down matches Cost Constraint"},
-            {"technology": "Prometheus", "reason": "Open-source requirement met"},
-        ]
+        query = str(requirements.get('constraints', 'azure architecture'))
+        f_log(f"Retrieving capabilities for query: {query}", c_type="process")
+        
+        # Use the local RAG search implementation
+        search_results = knowledge_base_retrieve(query)
+        
+        # Map back to expected format
+        return [{"technology": res["id"].replace(".md", ""), "reason": res["content"]} for res in search_results]
 
     def generate_architecture(self, requirements: dict[str, Any]) -> str:
         """
