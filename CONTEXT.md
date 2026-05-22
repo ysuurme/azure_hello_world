@@ -85,8 +85,8 @@ Use this module map to pinpoint the relevant files for your task and avoid loadi
 | `utils.m_persist_design` | 0 | 4 | deep module | Persists approved markdown and SVG deliverables to the `designs/` directory. |
 | `utils.m_search` | 0 | 1 | deep module | Abstraction for executing semantic queries against AI Search. |
 | `utils.m_tools` | 0 | 2 | deep module | Function calling capabilities for agents (e.g., `calculate_cost`). |
-| `agents.workflow_dispatcher` | 1 (`ui.app`) | 2+ | deep module | **NEW (ADR-010)** — Slash-command parser and capability-module router; sole entry point from `ui.app`. |
-| `agents.diagram_studio` | 1 (`workflow_dispatcher`) | 3 | deep module | **NEW (ADR-011)** — Diagram refinement module; grill loop → `DiagramBrief` → D2 → sketch-rendered SVG trio. |
+| `agents.workflow_dispatcher` | 1 (`ui.app`) | 2+ | deep module | Slash-command parser and capability-module router; sole entry point from `ui.app`. (ADR-010) |
+| `agents.diagram_studio` | 1 (`workflow_dispatcher`) | 3 | deep module | Diagram capability module (v0 tracer); single LLM call → D2 → sketch-rendered SVG. (ADR-011) |
 | `agents.design_architecture` | 1 (`workflow_dispatcher`) | 1 (wraps `utils.m_orchestrator`) | deep module | **NEW (ADR-010)** — Wraps the existing intake → composer flow as a registered module under `/design`. |
 
 ### Issue-Type → Files Index

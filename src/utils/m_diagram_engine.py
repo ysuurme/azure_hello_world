@@ -14,7 +14,7 @@ class DiagramEngine:
     def __init__(self, binary_path: str = None) -> None:
         self.binary_path = binary_path or D2_BINARY_PATH
 
-    def generate_svg(self, d2_syntax: str) -> bytes | None:
+    def generate_svg(self, d2_syntax: str, sketch: bool = True) -> bytes | None:
         """
         Takes raw .d2 syntactical mapping, compiles it, and returns the SVG bytes.
         """
@@ -29,8 +29,11 @@ class DiagramEngine:
                 f.write(d2_syntax)
 
             try:
+                args = [self.binary_path, input_file, output_file]
+                if sketch:
+                    args.append("--sketch")
                 # Standard library boundary: invoke the static binary
-                subprocess.run([self.binary_path, input_file, output_file], capture_output=True, text=True, check=True)
+                subprocess.run(args, capture_output=True, text=True, check=True)
 
                 with open(output_file, "rb") as f:
                     svg_bytes = f.read()

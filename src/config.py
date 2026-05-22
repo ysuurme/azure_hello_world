@@ -16,7 +16,11 @@ AZURE_AAIF_PROJECT_ENDPOINT = os.getenv("AZURE_AAIF_PROJECT_ENDPOINT")
 
 # --- AI Models ---
 # Structure allows easy reconfiguration of models cleanly per agent
-AGENT_MODELS = {"intake_reviewer": "gpt-5-mini", "architecture_composer": "DeepSeek-V3.1"}
+AGENT_MODELS = {
+    "intake_reviewer": "gpt-5-mini",
+    "architecture_composer": "DeepSeek-V3.1",
+    "diagram_studio": "gpt-5-mini",
+}
 
 # --- Architecture RAG & Design ---
 TEMPLATE_PATH = PROJECT_ROOT / "architecture" / "000_architecture_template.md"
