@@ -1,5 +1,5 @@
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from src.utils.m_capability_repo import CapabilityRepository
 
@@ -18,8 +18,8 @@ def test_capability_repository_init_creates_dir(tmp_path):
 def test_write_capability_writes_file_and_triggers_ingestion(tmp_path):
     storage_path = tmp_path / "test_caps"
     
-    with patch("src.utils.m_capability_repo.IngestionPipeline") as MockPipeline:
-        mock_pipeline_instance = MockPipeline.return_value
+    with patch("src.utils.m_capability_repo.IngestionPipeline") as mock_pipeline:
+        mock_pipeline_instance = mock_pipeline.return_value
         repo = CapabilityRepository(storage_path=str(storage_path))
 
         frontmatter = {"title": "Test Cap", "author": "Agent"}
@@ -29,7 +29,7 @@ def test_write_capability_writes_file_and_triggers_ingestion(tmp_path):
         full_path = repo.write_capability(filename, frontmatter, body)
 
         assert os.path.exists(full_path)
-        with open(full_path, "r", encoding="utf-8") as f:
+        with open(full_path, encoding="utf-8") as f:
             content = f.read()
 
         assert "title: Test Cap" in content

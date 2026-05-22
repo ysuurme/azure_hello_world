@@ -1,5 +1,4 @@
-import sys
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -16,9 +15,9 @@ def test_run_health_check_no_endpoint():
 
 @patch("src.utils.m_health_check.config.AZURE_AAIF_PROJECT_ENDPOINT", "https://fake.endpoint")
 @patch("src.utils.m_health_check.ClientManager")
-def test_run_health_check_success_no_deployments(MockClientManager):
+def test_run_health_check_success_no_deployments(mock_client_manager):
     """Test successful health check when deployment listing is not available."""
-    mock_cm = MockClientManager.return_value
+    mock_cm = mock_client_manager.return_value
     
     # Mock project client without inference
     mock_project_client = MagicMock()
@@ -43,9 +42,9 @@ def test_run_health_check_success_no_deployments(MockClientManager):
 @patch("src.utils.m_health_check.config.AZURE_AAIF_PROJECT_ENDPOINT", "https://fake.endpoint")
 @patch("src.utils.m_health_check.ClientManager")
 @patch("src.utils.m_health_check.config.AGENT_MODELS", {"intake_reviewer": "gpt-4o"})
-def test_run_health_check_success_with_deployments(MockClientManager):
+def test_run_health_check_success_with_deployments(mock_client_manager):
     """Test successful health check with deployment listing."""
-    mock_cm = MockClientManager.return_value
+    mock_cm = mock_client_manager.return_value
     
     # Mock project client with inference and deployments
     mock_project_client = MagicMock()
@@ -71,9 +70,9 @@ def test_run_health_check_success_with_deployments(MockClientManager):
 
 @patch("src.utils.m_health_check.config.AZURE_AAIF_PROJECT_ENDPOINT", "https://fake.endpoint")
 @patch("src.utils.m_health_check.ClientManager")
-def test_run_health_check_empty_response(MockClientManager):
+def test_run_health_check_empty_response(mock_client_manager):
     """Test health check exits when receiving empty response."""
-    mock_cm = MockClientManager.return_value
+    mock_cm = mock_client_manager.return_value
     mock_project_client = MagicMock()
     mock_cm.get_aiproject_client.return_value = mock_project_client
 
@@ -91,9 +90,9 @@ def test_run_health_check_empty_response(MockClientManager):
 
 @patch("src.utils.m_health_check.config.AZURE_AAIF_PROJECT_ENDPOINT", "https://fake.endpoint")
 @patch("src.utils.m_health_check.ClientManager")
-def test_run_health_check_fallback_max_tokens(MockClientManager):
+def test_run_health_check_fallback_max_tokens(mock_client_manager):
     """Test health check fallbacks to max_tokens when max_completion_tokens fails."""
-    mock_cm = MockClientManager.return_value
+    mock_cm = mock_client_manager.return_value
     mock_project_client = MagicMock()
     mock_cm.get_aiproject_client.return_value = mock_project_client
 
@@ -119,9 +118,9 @@ def test_run_health_check_fallback_max_tokens(MockClientManager):
 
 @patch("src.utils.m_health_check.config.AZURE_AAIF_PROJECT_ENDPOINT", "https://fake.endpoint")
 @patch("src.utils.m_health_check.ClientManager")
-def test_run_health_check_exception(MockClientManager):
+def test_run_health_check_exception(mock_client_manager):
     """Test health check handles and logs unexpected exceptions."""
-    mock_cm = MockClientManager.return_value
+    mock_cm = mock_client_manager.return_value
     mock_cm.get_aiproject_client.side_effect = Exception("DeploymentNotFound 404")
 
     with pytest.raises(SystemExit) as exc_info:

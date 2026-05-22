@@ -8,7 +8,10 @@ class TestUITopology:
         """Initializes the Streamlit AppTest framework for Headless UI validation."""
         from unittest.mock import patch
         # Mock orchestrator to prevent real LLM network calls in tests
-        with patch("src.utils.m_orchestrator.AgenticOrchestrator.orchestrate_cycle", return_value=({}, "Mocked response")):
+        with patch(
+            "src.utils.m_orchestrator.AgenticOrchestrator.orchestrate_cycle",
+            return_value=({}, "Mocked response")
+        ):
             at = AppTest.from_file("src/ui/app.py")
             yield at
 
