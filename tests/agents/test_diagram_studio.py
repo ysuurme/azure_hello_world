@@ -1,4 +1,7 @@
+from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from src.agents._refinement import GrillQuestion, GrillRound
 from src.agents.diagram_studio import DiagramBrief, DiagramStudioModule, ModuleResponse
@@ -108,60 +111,38 @@ class TestFirstTurnGrillRound:
         assert captured["description"] == "medallion architecture"
 
 
-class TestRichDescriptionCompletedInFirstRound:
-    def test_rich_description_returns_completed(self):
-        module = _make_module()
-        with patch.object(module, "grill_round", return_value=_grill_complete()):
-            with patch.object(module, "_generate_d2_from_brief", return_value="A -> B"):
-                with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
-                    mock_cls.return_value.generate_svg.return_value = b"<svg/>"
-                    result = module.handle("/diagram API connects to Database with a query", {})
-        assert result.status == "completed"
+class TestRichDescriptionAwaitingApproval:
+    """A fully-specified description on the first turn goes straight to awaiting_approval."""
 
-    def test_rich_description_has_d2_artifact(self):
+    def test_rich_description_returns_awaiting_approval(self):
         module = _make_module()
         with patch.object(module, "grill_round", return_value=_grill_complete()):
-            with patch.object(module, "_generate_d2_from_brief", return_value="A -> B"):
-                with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
-                    mock_cls.return_value.generate_svg.return_value = b"<svg/>"
-                    result = module.handle("/diagram a detailed system", {})
-        assert "d2" in result.artifacts
-        assert result.artifacts["d2"] == "A -> B"
+            result = module.handle("/diagram API connects to Database with a query", {})
+        assert result.status == "awaiting_approval"
 
-    def test_rich_description_has_svg_artifact(self):
+    def test_brief_markdown_is_in_response(self):
         module = _make_module()
         with patch.object(module, "grill_round", return_value=_grill_complete()):
-            with patch.object(module, "_generate_d2_from_brief", return_value="A -> B"):
-                with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
-                    mock_cls.return_value.generate_svg.return_value = b"<svg/>"
-                    result = module.handle("/diagram a detailed system", {})
-        assert "svg" in result.artifacts
-        assert result.artifacts["svg"] == b"<svg/>"
+            result = module.handle("/diagram a detailed system", {})
+        assert "API System" in result.response_text
 
-    def test_rich_description_no_svg_when_engine_fails(self):
+    def test_no_artifacts_at_approval_stage(self):
         module = _make_module()
         with patch.object(module, "grill_round", return_value=_grill_complete()):
-            with patch.object(module, "_generate_d2_from_brief", return_value="A -> B"):
-                with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
-                    mock_cls.return_value.generate_svg.return_value = None
-                    result = module.handle("/diagram a detailed system", {})
-        assert "svg" not in result.artifacts
+            result = module.handle("/diagram a detailed system", {})
+        assert result.artifacts == {}
 
-    def test_rich_description_error_when_d2_generation_fails(self):
+    def test_updated_state_has_awaiting_approval_phase(self):
         module = _make_module()
         with patch.object(module, "grill_round", return_value=_grill_complete()):
-            with patch.object(module, "_generate_d2_from_brief", return_value=None):
-                result = module.handle("/diagram a detailed system", {})
-        assert result.status == "error"
+            result = module.handle("/diagram a detailed system", {})
+        assert result.updated_state.get("phase") == "awaiting_approval"
 
-    def test_rich_description_includes_d2_in_response_text(self):
+    def test_brief_preserved_in_state(self):
         module = _make_module()
         with patch.object(module, "grill_round", return_value=_grill_complete()):
-            with patch.object(module, "_generate_d2_from_brief", return_value="API -> Backend"):
-                with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
-                    mock_cls.return_value.generate_svg.return_value = b"<svg/>"
-                    result = module.handle("/diagram detailed system", {})
-        assert "API -> Backend" in result.response_text
+            result = module.handle("/diagram a detailed system", {})
+        assert result.updated_state.get("brief", {}).get("subject") == "API System"
 
 
 class TestMultiTurnGrillLoop:
@@ -172,26 +153,21 @@ class TestMultiTurnGrillLoop:
         assert turn1.status == "in_refinement"
         assert turn1.updated_state["phase"] == "grilling"
 
-    def test_answers_fold_into_brief_and_complete(self):
+    def test_answers_fold_into_brief_and_reach_awaiting_approval(self):
         module = _make_module()
         with patch.object(module, "grill_round", return_value=_grill_incomplete()):
             turn1 = module.handle("/diagram a thing with some boxes", {})
 
         with patch.object(module, "grill_round", return_value=_grill_complete()):
-            with patch.object(module, "_generate_d2_from_brief", return_value="API -> Backend"):
-                with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
-                    mock_cls.return_value.generate_svg.return_value = b"<svg/>"
-                    turn2 = module.handle(
-                        "3 components: API Gateway, Backend, Database. Flows left to right.",
-                        turn1.updated_state,
-                    )
+            turn2 = module.handle(
+                "3 components: API Gateway, Backend, Database. Flows left to right.",
+                turn1.updated_state,
+            )
 
-        assert turn2.status == "completed"
-        assert "d2" in turn2.artifacts
-        assert "svg" in turn2.artifacts
+        assert turn2.status == "awaiting_approval"
 
-    def test_full_state_machine_transitions(self):
-        """init → in_refinement (grilling) → completed: all three state transitions."""
+    def test_full_state_machine_transitions(self, tmp_path: Path):
+        """init → in_refinement → awaiting_approval → completed: all four state transitions."""
         module = _make_module()
 
         # Transition 1: init → grilling
@@ -200,16 +176,23 @@ class TestMultiTurnGrillLoop:
         assert t1.status == "in_refinement"
         assert t1.updated_state["phase"] == "grilling"
 
-        # Transition 2: grilling → completed (answers complete the brief)
+        # Transition 2: grilling → awaiting_approval
         with patch.object(module, "grill_round", return_value=_grill_complete()):
-            with patch.object(module, "_generate_d2_from_brief", return_value="API -> Backend -> Database"):
-                with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
-                    mock_cls.return_value.generate_svg.return_value = b"<svg bytes/>"
-                    t2 = module.handle("API Gateway, Backend, Database left to right", t1.updated_state)
+            t2 = module.handle("API Gateway, Backend, Database left to right", t1.updated_state)
+        assert t2.status == "awaiting_approval"
+        assert t2.updated_state["phase"] == "awaiting_approval"
 
-        assert t2.status == "completed"
-        assert t2.artifacts.get("d2") == "API -> Backend -> Database"
-        assert t2.artifacts.get("svg") == b"<svg bytes/>"
+        # Transition 3: awaiting_approval → completed (user approves)
+        with patch.object(module, "_generate_d2_from_brief", return_value="API -> Backend -> Database"):
+            with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
+                mock_cls.return_value.generate_svg.return_value = b"<svg bytes/>"
+                with patch("src.agents.diagram_studio.ArchitecturePersister") as mock_persister:
+                    mock_persister.return_value.persist_diagram.return_value = tmp_path / "diagrams" / "x_123"
+                    t3 = module.handle("yes", t2.updated_state)
+
+        assert t3.status == "completed"
+        assert t3.artifacts.get("d2") == "API -> Backend -> Database"
+        assert t3.artifacts.get("svg") == b"<svg bytes/>"
 
     def test_grill_turn_passes_original_description_as_context(self):
         captured: dict = {}
@@ -223,38 +206,194 @@ class TestMultiTurnGrillLoop:
             return _grill_complete()
 
         with patch.object(module, "grill_round", side_effect=capture_grill):
-            with patch.object(module, "_generate_d2_from_brief", return_value="A -> B"):
-                with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
-                    mock_cls.return_value.generate_svg.return_value = b"<svg/>"
-                    module.handle("bronze, silver, gold layers", t1.updated_state)
+            module.handle("bronze, silver, gold layers", t1.updated_state)
 
         assert "medallion architecture" in captured["description"]
         assert "bronze, silver, gold layers" in captured["description"]
 
-    def test_svg_bytes_propagate_to_final_response(self):
+    def test_svg_bytes_propagate_to_final_response(self, tmp_path: Path):
         module = _make_module()
         with patch.object(module, "grill_round", return_value=_grill_incomplete()):
             t1 = module.handle("/diagram a system", {})
 
         with patch.object(module, "grill_round", return_value=_grill_complete()):
-            with patch.object(module, "_generate_d2_from_brief", return_value="X -> Y"):
-                with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
-                    mock_cls.return_value.generate_svg.return_value = b"<svg>real svg</svg>"
-                    t2 = module.handle("answer", t1.updated_state)
+            t2 = module.handle("answer", t1.updated_state)
 
-        assert t2.artifacts["svg"] == b"<svg>real svg</svg>"
+        with patch.object(module, "_generate_d2_from_brief", return_value="X -> Y"):
+            with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
+                mock_cls.return_value.generate_svg.return_value = b"<svg>real svg</svg>"
+                with patch("src.agents.diagram_studio.ArchitecturePersister") as mock_persister:
+                    mock_persister.return_value.persist_diagram.return_value = tmp_path / "diagrams" / "x_123"
+                    t3 = module.handle("yes", t2.updated_state)
+
+        assert t3.artifacts["svg"] == b"<svg>real svg</svg>"
+
+
+class TestApprovalGate:
+    """Approval gate: awaiting_approval phase routing."""
+
+    _APPROVAL_INPUTS = ["yes", "approved", "looks good", "lgtm", "ship it"]
+    _REVISION_INPUTS = [
+        "please change the layout to vertical",
+        "add a load balancer",
+        "no thanks",
+        "can you make it horizontal",
+    ]
+
+    @pytest.mark.parametrize("phrase", _APPROVAL_INPUTS)
+    def test_approval_phrase_triggers_generation(self, phrase: str, tmp_path: Path):
+        module = _make_module()
+        state = {
+            "phase": "awaiting_approval",
+            "description": "API system",
+            "brief": _grill_complete().updated_brief,
+        }
+        with patch.object(module, "_generate_d2_from_brief", return_value="A -> B"):
+            with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
+                mock_cls.return_value.generate_svg.return_value = b"<svg/>"
+                with patch("src.agents.diagram_studio.ArchitecturePersister") as mock_persister:
+                    mock_persister.return_value.persist_diagram.return_value = tmp_path / "diagrams" / "x_1"
+                    result = module.handle(phrase, state)
+        assert result.status == "completed"
+
+    @pytest.mark.parametrize("phrase", _APPROVAL_INPUTS)
+    def test_approval_is_case_insensitive(self, phrase: str, tmp_path: Path):
+        module = _make_module()
+        state = {
+            "phase": "awaiting_approval",
+            "description": "API system",
+            "brief": _grill_complete().updated_brief,
+        }
+        with patch.object(module, "_generate_d2_from_brief", return_value="A -> B"):
+            with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
+                mock_cls.return_value.generate_svg.return_value = b"<svg/>"
+                with patch("src.agents.diagram_studio.ArchitecturePersister") as mock_persister:
+                    mock_persister.return_value.persist_diagram.return_value = tmp_path / "diagrams" / "x_1"
+                    result = module.handle(phrase.upper(), state)
+        assert result.status == "completed"
+
+    @pytest.mark.parametrize("revision", _REVISION_INPUTS)
+    def test_non_approval_re_enters_grill_loop(self, revision: str):
+        module = _make_module()
+        state = {
+            "phase": "awaiting_approval",
+            "description": "API system",
+            "brief": _grill_complete().updated_brief,
+        }
+        with patch.object(module, "grill_round", return_value=_grill_incomplete()):
+            result = module.handle(revision, state)
+        assert result.status == "in_refinement"
+
+    def test_revision_preserves_prior_brief(self):
+        module = _make_module()
+        prior_brief = _grill_complete().updated_brief
+        state = {
+            "phase": "awaiting_approval",
+            "description": "API system",
+            "brief": prior_brief,
+        }
+
+        captured: dict = {}
+
+        def capture_grill(description: str, partial_brief: dict) -> GrillRound:
+            captured["brief"] = partial_brief
+            return _grill_incomplete()
+
+        with patch.object(module, "grill_round", side_effect=capture_grill):
+            module.handle("please change the layout to vertical", state)
+
+        assert captured["brief"] == prior_brief
+
+    def test_revision_does_not_write_files(self, tmp_path: Path):
+        module = _make_module()
+        state = {
+            "phase": "awaiting_approval",
+            "description": "API system",
+            "brief": _grill_complete().updated_brief,
+        }
+        with patch.object(module, "grill_round", return_value=_grill_incomplete()):
+            module.handle("please change the layout to vertical", state)
+
+        diagrams_dir = tmp_path / "diagrams"
+        assert not diagrams_dir.exists()
+
+    def test_happy_path_persists_trio(self, tmp_path: Path):
+        module = _make_module()
+        state = {
+            "phase": "awaiting_approval",
+            "description": "API system",
+            "brief": _grill_complete().updated_brief,
+        }
+        persist_mock = MagicMock(return_value=tmp_path / "diagrams" / "API_System_123")
+        with patch.object(module, "_generate_d2_from_brief", return_value="API -> DB"):
+            with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
+                mock_cls.return_value.generate_svg.return_value = b"<svg/>"
+                with patch("src.agents.diagram_studio.ArchitecturePersister") as mock_persister:
+                    mock_persister.return_value.persist_diagram = persist_mock
+                    result = module.handle("yes", state)
+
+        persist_mock.assert_called_once()
+        assert "persisted_path" in result.artifacts
+
+    def test_happy_path_response_contains_d2(self, tmp_path: Path):
+        module = _make_module()
+        state = {
+            "phase": "awaiting_approval",
+            "description": "API system",
+            "brief": _grill_complete().updated_brief,
+        }
+        with patch.object(module, "_generate_d2_from_brief", return_value="API -> Backend"):
+            with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
+                mock_cls.return_value.generate_svg.return_value = b"<svg/>"
+                with patch("src.agents.diagram_studio.ArchitecturePersister") as mock_persister:
+                    mock_persister.return_value.persist_diagram.return_value = tmp_path / "diagrams" / "x"
+                    result = module.handle("yes", state)
+        assert "API -> Backend" in result.response_text
+
+    def test_d2_generation_failure_returns_error(self, tmp_path: Path):
+        module = _make_module()
+        state = {
+            "phase": "awaiting_approval",
+            "description": "API system",
+            "brief": _grill_complete().updated_brief,
+        }
+        with patch.object(module, "_generate_d2_from_brief", return_value=None):
+            result = module.handle("yes", state)
+        assert result.status == "error"
+
+    def test_no_svg_when_engine_fails(self, tmp_path: Path):
+        module = _make_module()
+        state = {
+            "phase": "awaiting_approval",
+            "description": "API system",
+            "brief": _grill_complete().updated_brief,
+        }
+        with patch.object(module, "_generate_d2_from_brief", return_value="A -> B"):
+            with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
+                mock_cls.return_value.generate_svg.return_value = None
+                with patch("src.agents.diagram_studio.ArchitecturePersister") as mock_persister:
+                    mock_persister.return_value.persist_diagram.return_value = tmp_path / "diagrams" / "x"
+                    result = module.handle("yes", state)
+        assert "svg" not in result.artifacts
 
 
 class TestSketchFlagForwarding:
-    def test_sketch_true_forwarded_to_engine(self):
+    def test_sketch_true_forwarded_to_engine(self, tmp_path: Path):
         module = _make_module()
+
+        # First: grill completes → awaiting_approval
         with patch.object(module, "grill_round", return_value=_grill_complete()):
-            with patch.object(module, "_generate_d2_from_brief", return_value="A -> B"):
-                with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
-                    mock_engine = MagicMock()
-                    mock_engine.generate_svg.return_value = b"<svg/>"
-                    mock_cls.return_value = mock_engine
-                    module.handle("/diagram a test diagram", {})
+            approval_state = module.handle("/diagram a test diagram", {}).updated_state
+
+        # Then: approve → generate
+        with patch.object(module, "_generate_d2_from_brief", return_value="A -> B"):
+            with patch("src.agents.diagram_studio.DiagramEngine") as mock_cls:
+                mock_engine = MagicMock()
+                mock_engine.generate_svg.return_value = b"<svg/>"
+                mock_cls.return_value = mock_engine
+                with patch("src.agents.diagram_studio.ArchitecturePersister") as mock_persister:
+                    mock_persister.return_value.persist_diagram.return_value = tmp_path / "diagrams" / "x"
+                    module.handle("yes", approval_state)
 
         mock_engine.generate_svg.assert_called_once()
         _, kwargs = mock_engine.generate_svg.call_args
