@@ -9,26 +9,27 @@ from src.utils.m_log import f_log
 
 class CapabilityRepository:
     """
-    Manages Capability Markdown CRUD operations. 
+    Manages Capability Markdown CRUD operations.
     Triggers the AI Search Ingestion logic upon modification.
     """
+
     def __init__(self, storage_path: str = "capabilities") -> None:
         self.storage_path = storage_path
         self.ingester = IngestionPipeline(search_client=None)
-        
+
         if not os.path.exists(self.storage_path):
             os.makedirs(self.storage_path)
 
     def write_capability(self, filename: str, frontmatter: dict[str, Any], body: str) -> str:
         f_log(f"Writing capability {filename}", c_type="process")
         full_path = os.path.join(self.storage_path, filename)
-        
+
         yaml_content = yaml.dump(frontmatter, sort_keys=False)
         content = f"---\n{yaml_content}---\n\n{body}"
-        
+
         with open(full_path, "w", encoding="utf-8") as f:
             f.write(content)
-            
+
         self._trigger_ingestion(full_path)
         return full_path
 

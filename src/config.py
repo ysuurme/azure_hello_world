@@ -16,10 +16,7 @@ AZURE_AAIF_PROJECT_ENDPOINT = os.getenv("AZURE_AAIF_PROJECT_ENDPOINT")
 
 # --- AI Models ---
 # Structure allows easy reconfiguration of models cleanly per agent
-AGENT_MODELS = {
-    "intake_reviewer": "gpt-5-mini",
-    "architecture_composer": "DeepSeek-V3.1"
-}
+AGENT_MODELS = {"intake_reviewer": "gpt-5-mini", "architecture_composer": "DeepSeek-V3.1"}
 
 # --- Architecture RAG & Design ---
 TEMPLATE_PATH = PROJECT_ROOT / "architecture" / "000_architecture_template.md"
@@ -29,7 +26,7 @@ DESIGNS_ARCHIVE_DIR = PROJECT_ROOT / "designs" / "approved"
 D2_BINARY_PATH = os.environ.get("D2_BINARY_PATH", "d2")
 
 # --- Logging ---
-LOG_PROFILE = "PRD"          # "PRD" | "TEST" | "DEBUG"
+LOG_PROFILE = "PRD"  # "PRD" | "TEST" | "DEBUG"
 LOG_SEPARATOR_WIDTH = 80
 LOG_LINE_WIDTH = 120
 DIR_LOG = PROJECT_ROOT / "logs"

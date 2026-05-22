@@ -8,10 +8,12 @@ from src.utils.m_log import f_log
 
 # Use Foundry/OpenAI-style responses client via AIProjectClient.get_openai_client()
 
+
 class IntakeReviewerAgent:
     """
     Validates user input against the architecture template natively via Live LLM integration.
     """
+
     def __init__(self, client_manager: m_ai_client.ClientManager) -> None:
         # Require a shared ClientManager instance to be injected at bootstrap.
         if client_manager is None:
@@ -19,7 +21,7 @@ class IntakeReviewerAgent:
         self.client_manager = client_manager
         self.template_path = TEMPLATE_PATH
         self._load_template()
-        
+
         self.system_prompt = (
             "You are the Intake Reviewer for an Architecture Sentinel. "
             f"Your job is to review the user's software description against this template: \n{self.template}\n"

@@ -12,9 +12,10 @@ from src.utils.m_tools import calculate_cost
 
 class ArchitectureComposerAgent:
     """
-    Core "Maker" Agent using MAF concepts. 
+    Core "Maker" Agent using MAF concepts.
     Queries AI search for capabilities and generates the 5-point architecture markdown.
     """
+
     def __init__(self, client_manager: m_ai_client.ClientManager) -> None:
         # Require a shared ClientManager instance to be injected at bootstrap.
         if client_manager is None:
@@ -42,7 +43,7 @@ class ArchitectureComposerAgent:
         # In reality, this queries `src.utils.m_search.knowledge_base_retrieve`
         return [
             {"technology": "Azure Container Apps", "reason": "Serverless scale-down matches Cost Constraint"},
-            {"technology": "Prometheus", "reason": "Open-source requirement met"}
+            {"technology": "Prometheus", "reason": "Open-source requirement met"},
         ]
 
     def generate_architecture(self, requirements: dict[str, Any]) -> str:
@@ -51,24 +52,18 @@ class ArchitectureComposerAgent:
         """
         f_log("Composer received ready-requirements. Searching capabilities repo.", c_type="process")
         selected_tech = self._retrieve_capabilities(requirements)
-        
+
         # Use the chat completions client for LLM drafting.
         # Do not fallback to mocked output — raise on any missing/incompatible surfaces.
-            
+
         f_log("Drafting 5-point architecture via Azure Foundry...", c_type="process")
 
         # Checker Synergy: Price evaluation dynamically added
         tech_names = [tech.get("technology") for tech in selected_tech]
         cost_evaluation = calculate_cost(tech_names)
-        
-        user_query = (
-            f"User Intake Requirements Constraints:\n"
-            f"{json.dumps(requirements, indent=2)}\n\n"
-        )
-        user_query += (
-            f"Maker Output (Initial RAG Selection):\n"
-            f"{json.dumps(selected_tech, indent=2)}\n\n"
-        )
+
+        user_query = f"User Intake Requirements Constraints:\n{json.dumps(requirements, indent=2)}\n\n"
+        user_query += f"Maker Output (Initial RAG Selection):\n{json.dumps(selected_tech, indent=2)}\n\n"
         user_query += (
             f"Checker Constraint Evaluation (Azure Retail Price Live Sync):\n"
             f"{json.dumps(cost_evaluation, indent=2)}\n\n"
@@ -81,7 +76,7 @@ class ArchitectureComposerAgent:
             "accordingly. Draft the markdown strictly according to the format, "
             "and ALWAYS include the ```d2 code block at the end."
         )
-        
+
         # Call AI Foundry Responses via OpenAI surface exclusively.
         try:
             f_log("Calling AI Foundry Responses via OpenAI surface...", c_type="process")

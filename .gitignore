@@ -1,5 +1,5 @@
 # Python
-__pycache__/
+**/__pycache__/
 .pytest_cache/
 *.pyc
 *.pyo
@@ -32,6 +32,10 @@ build/
 # Logs
 logs/
 designs/
+
+# Agent planning artifacts (ephemeral, auto-generated)
+.planning/
+docs/CODEBASE_MAP.md
 
 # Linting & Testing
 .ruff_cache/

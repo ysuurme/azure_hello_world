@@ -11,6 +11,7 @@ Usage:
 
 Exit codes: 0 = success, 1 = bad response, 2 = connection refused (LM Studio not running).
 """
+
 import argparse
 import json
 import os
@@ -36,11 +37,13 @@ def load_dotenv() -> dict[str, str]:
 
 def call_local_lm(task: str, context: str, model: str, base_url: str) -> str:
     content = f"Context:\n{context}\n\nTask:\n{task}" if context else task
-    payload = json.dumps({
-        "model": model,
-        "max_tokens": 4096,
-        "messages": [{"role": "user", "content": content}],
-    }).encode("utf-8")
+    payload = json.dumps(
+        {
+            "model": model,
+            "max_tokens": 4096,
+            "messages": [{"role": "user", "content": content}],
+        }
+    ).encode("utf-8")
 
     req = urllib.request.Request(
         f"{base_url}/v1/messages",

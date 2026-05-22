@@ -41,36 +41,36 @@ logging.addLevelName(STAGE, "STAGE")
 
 # Semantic emoji vocabulary — auto-prepended by f_log() when c_type is a key
 STAGE_EMOJI = {
-    "start":     "🚀",   # Request received or pipeline kickoff
-    "retrieve":  "🔍",   # Knowledge base retrieval 
-    "reasoning": "🧠",   # Agent thinking or synthesizing
-    "critique":  "🛡️",  # Sentinel Maker/Checker evaluation
-    "process":   "⚙️",    # General processing or API calls
-    "success":   "✅",   # Step completed successfully
-    "complete":  "🎉",   # Final pipeline success
-    "gate_fail": "🚫",   # Security/Cost gate rejection
+    "start": "🚀",  # Request received or pipeline kickoff
+    "retrieve": "🔍",  # Knowledge base retrieval
+    "reasoning": "🧠",  # Agent thinking or synthesizing
+    "critique": "🛡️",  # Sentinel Maker/Checker evaluation
+    "process": "⚙️",  # General processing or API calls
+    "success": "✅",  # Step completed successfully
+    "complete": "🎉",  # Final pipeline success
+    "gate_fail": "🚫",  # Security/Cost gate rejection
 }
 
 # Maps LOG_PROFILE to console handler level
 _PROFILE_LEVELS = {
-    "PRD":   STAGE,           # 25: stage markers + warning + error + critical
-    "TEST":  logging.INFO,    # 20: all info messages + above
-    "DEBUG": logging.DEBUG,   # 10: everything
+    "PRD": STAGE,  # 25: stage markers + warning + error + critical
+    "TEST": logging.INFO,  # 20: all info messages + above
+    "DEBUG": logging.DEBUG,  # 10: everything
 }
 
 # Console format per profile
 _PROFILE_FORMATS = {
-    "PRD":   "%(message)s",
-    "TEST":  "%(asctime)s - %(levelname)s - %(message)s",
+    "PRD": "%(message)s",
+    "TEST": "%(asctime)s - %(levelname)s - %(message)s",
     "DEBUG": "%(asctime)s - %(levelname)s - %(name)s - %(message)s",
 }
 
 # Maps standard c_type strings to logging levels
 _TYPE_TO_LEVEL = {
-    "debug":    logging.DEBUG,
-    "info":     logging.INFO,
-    "warning":  logging.WARNING,
-    "error":    logging.ERROR,
+    "debug": logging.DEBUG,
+    "info": logging.INFO,
+    "warning": logging.WARNING,
+    "error": logging.ERROR,
     "critical": logging.CRITICAL,
 }
 
@@ -83,6 +83,7 @@ _logger = logging.getLogger("azure_agent")
 ###############################################################################
 # FORMATTER
 ###############################################################################
+
 
 class IndentedFormatter(logging.Formatter):
     """
@@ -121,6 +122,7 @@ class IndentedFormatter(logging.Formatter):
 # SETUP
 ###############################################################################
 
+
 def setup_logging(profile: str = None) -> None:
     """
     One-time logging configuration. Call from main.py before any f_log() calls.
@@ -155,10 +157,12 @@ def setup_logging(profile: str = None) -> None:
     # --- Console Handler ---
     console_handler = logging.StreamHandler()
     console_handler.setLevel(_PROFILE_LEVELS[active_profile])
-    console_handler.setFormatter(logging.Formatter(
-        fmt=_PROFILE_FORMATS[active_profile],
-        datefmt="%H:%M:%S",
-    ))
+    console_handler.setFormatter(
+        logging.Formatter(
+            fmt=_PROFILE_FORMATS[active_profile],
+            datefmt="%H:%M:%S",
+        )
+    )
     logging.root.addHandler(console_handler)
 
     # --- File Handler ---
@@ -169,10 +173,12 @@ def setup_logging(profile: str = None) -> None:
         encoding="utf-8",
     )
     file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(IndentedFormatter(
-        fmt="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    ))
+    file_handler.setFormatter(
+        IndentedFormatter(
+            fmt="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
     logging.root.addHandler(file_handler)
 
     # --- Suppress noisy third-party loggers ---
@@ -182,11 +188,8 @@ def setup_logging(profile: str = None) -> None:
     # Startup informational log for TEST profile: indicate chosen Azure auth mode
     if active_profile == "TEST":
         auth_mode = "service_principal" if getattr(config, "USE_AZURE_SERVICE_PRINCIPAL", False) else "cli"
-        azure_auth_mode = getattr(config, 'AZURE_AUTH_MODE', 'cli')
-        _logger.info(
-            f"Startup: Azure auth mode selected: {auth_mode} "
-            f"(AZURE_AUTH_MODE={azure_auth_mode})"
-        )
+        azure_auth_mode = getattr(config, "AZURE_AUTH_MODE", "cli")
+        _logger.info(f"Startup: Azure auth mode selected: {auth_mode} (AZURE_AUTH_MODE={azure_auth_mode})")
 
     _is_configured = True
 
@@ -201,6 +204,7 @@ def _ensure_setup() -> None:
 # PUBLIC API
 ###############################################################################
 
+
 def log_new_request(request_title: str) -> None:
     """Log the start of a new user request with clear separators and timestamp.
 
@@ -212,12 +216,13 @@ def log_new_request(request_title: str) -> None:
     # Use the 'start' stage emoji and separator lines for visibility
     f_log(request_title, c_type="start", c_before="=", c_after="=")
 
+
 def f_log(
     c_message: str,
-    c_type:    str  = "info",
-    b_raise:   bool = False,
-    c_before:  str  = None,
-    c_after:   str  = None,
+    c_type: str = "info",
+    b_raise: bool = False,
+    c_before: str = None,
+    c_after: str = None,
 ) -> None:
     """
     Central logging function for all project modules.
@@ -271,6 +276,7 @@ def f_log(
 # DECORATORS
 ###############################################################################
 
+
 def f_log_start_end(c_separator: str = "-"):
     """
     Decorator to log the start and end of a function call.
@@ -280,6 +286,7 @@ def f_log_start_end(c_separator: str = "-"):
     c_separator : str
         Character for separator lines around the log messages.
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -287,7 +294,9 @@ def f_log_start_end(c_separator: str = "-"):
             result = func(*args, **kwargs)
             f_log(f"Ended {func.__name__}()", c_after=c_separator)
             return result
+
         return wrapper
+
     return decorator
 
 
@@ -316,19 +325,22 @@ def f_log_execution(c_project: str, b_start: bool = True) -> None:
         _start_times[c_project] = time.time()
         f_log(
             f"{action} of the {c_project.upper()} program.",
-            c_before="=", c_after="=",
+            c_before="=",
+            c_after="=",
         )
         return
 
     f_log(
         f"{action} of the {c_project.upper()} program.",
-        c_before="=", c_after="-",
+        c_before="=",
+        c_after="-",
     )
 
     if c_project not in _start_times:
         f_log(
             "No start time recorded. Call f_log_execution with b_start=True first.",
-            c_type="warning", c_after="=",
+            c_type="warning",
+            c_after="=",
         )
         return
 

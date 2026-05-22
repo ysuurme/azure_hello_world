@@ -9,7 +9,7 @@ class TestDiagramEngine:
         engine = DiagramEngine()
         d2_syntax = "direction: right; User -> Agent"
         svg_bytes = engine.generate_svg(d2_syntax)
-        
+
         assert svg_bytes is not None
         assert b"<svg" in svg_bytes
         assert b"User" in svg_bytes
@@ -22,7 +22,7 @@ class TestDiagramEngine:
         engine = DiagramEngine()
         d2_syntax = "invalid syntax {{"
         svg_bytes = engine.generate_svg(d2_syntax)
-        
+
         assert svg_bytes is None
 
     def test_binary_not_found(self):
@@ -32,5 +32,5 @@ class TestDiagramEngine:
         engine = DiagramEngine(binary_path="/non/existent/path/to/d2")
         d2_syntax = "User -> Agent"
         svg_bytes = engine.generate_svg(d2_syntax)
-        
+
         assert svg_bytes is None
