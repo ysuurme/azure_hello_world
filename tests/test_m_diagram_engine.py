@@ -8,11 +8,17 @@ class TestDiagramEngine:
         Tests that valid D2 syntax produces a valid SVG output.
         """
         engine = DiagramEngine()
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = b'<svg xmlns="http://www.w3.org/2000/svg"><text>User</text><text>Agent</text></svg>'
+        
+        def mock_subprocess_run(cmd, *args, **kwargs):
+            # cmd is [self.binary_path, input_file, output_file]
+            output_file = cmd[2]
+            with open(output_file, "wb") as f:
+                f.write(b'<svg xmlns="http://www.w3.org/2000/svg"><text>User</text><text>Agent</text></svg>')
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            return mock_result
 
-        with patch("src.utils.m_diagram_engine.subprocess.run", return_value=mock_result):
+        with patch("src.utils.m_diagram_engine.subprocess.run", side_effect=mock_subprocess_run):
             svg_bytes = engine.generate_svg("direction: right; User -> Agent")
 
         assert svg_bytes is not None
