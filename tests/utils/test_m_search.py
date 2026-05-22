@@ -1,5 +1,4 @@
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from src.utils.m_search import knowledge_base_retrieve
 
