@@ -1,6 +1,8 @@
 import os
 from unittest.mock import patch
 
+import pytest
+
 from src.utils.m_capability_repo import CapabilityRepository
 
 
@@ -38,3 +40,34 @@ def test_write_capability_writes_file_and_triggers_ingestion(tmp_path):
 
         # Verify ingestion was triggered
         mock_pipeline_instance.ingest_local_markdown.assert_called_once_with(str(storage_path))
+
+
+def test_default_path_uses_second_brain_capabilities_when_set(tmp_path, monkeypatch):
+    caps_path = tmp_path / "capabilities"
+    caps_path.mkdir()
+
+    monkeypatch.setattr("src.utils.m_capability_repo.SECOND_BRAIN_PATH", str(tmp_path))
+
+    with patch("src.utils.m_capability_repo.IngestionPipeline"):
+        repo = CapabilityRepository()
+
+    assert repo.storage_path == str(caps_path)
+
+
+def test_default_path_falls_back_to_project_root_without_second_brain(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.utils.m_capability_repo.SECOND_BRAIN_PATH", None)
+    monkeypatch.setattr("src.utils.m_capability_repo.PROJECT_ROOT", tmp_path)
+
+    with patch("src.utils.m_capability_repo.IngestionPipeline"):
+        repo = CapabilityRepository()
+
+    assert repo.storage_path == str(tmp_path / "capabilities")
+
+
+def test_environment_error_when_second_brain_capabilities_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.utils.m_capability_repo.SECOND_BRAIN_PATH", str(tmp_path))
+    # tmp_path/capabilities does not exist
+
+    with patch("src.utils.m_capability_repo.IngestionPipeline"):
+        with pytest.raises(OSError, match="does not exist on disk"):
+            CapabilityRepository()

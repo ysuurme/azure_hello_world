@@ -99,6 +99,7 @@ To run this application locally, you must satisfy the following environment and 
 4.  **Azure RBAC Role**: Your user account must have the **"Cognitive Services OpenAI User"** role assigned on the Azure AI Foundry project or its parent Resource Group.
 5.  **Environment Variables**: Create a `.env` file in the project root with:
     - `AZURE_AAIF_PROJECT_ENDPOINT`: The endpoint for your AI Foundry project (e.g., `https://<REGION>.api.azureml.ms`).
+    - (Optional) `SECOND_BRAIN_PATH`: Absolute path to your local `my_second_brain` repository (e.g., `/home/user/my_second_brain`). When set, `CapabilityRepository` reads from `$SECOND_BRAIN_PATH/capabilities/` and approved designs are written to `$SECOND_BRAIN_PATH/architecture/designs/approved/`. If unset, the engine falls back to local project directories (safe for CI).
     - (Optional) `AZURE_AUTH_MODE`: Set to `cli` (default) for `az login` or `sp` for Service Principal.
     - (Optional) `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_SECRET`: Required if `AZURE_AUTH_MODE=sp`.
 6.  **Model Deployments**: Ensure the following models are deployed in your AI Foundry project with names matching `config.py`:

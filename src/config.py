@@ -24,10 +24,10 @@ AGENT_MODELS = {
 
 # --- Architecture RAG & Design ---
 TEMPLATE_PATH = PROJECT_ROOT / "architecture" / "000_architecture_template.md"
-_SECOND_BRAIN_PATH = os.getenv("SECOND_BRAIN_PATH")
+SECOND_BRAIN_PATH = os.getenv("SECOND_BRAIN_PATH")
 DESIGNS_ARCHIVE_DIR = (
-    Path(_SECOND_BRAIN_PATH) / "architecture" / "designs" / "approved"
-    if _SECOND_BRAIN_PATH
+    Path(SECOND_BRAIN_PATH) / "architecture" / "designs" / "approved"
+    if SECOND_BRAIN_PATH
     else PROJECT_ROOT / "designs" / "approved"
 )
 

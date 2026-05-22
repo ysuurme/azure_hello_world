@@ -1,10 +1,21 @@
 import os
+from pathlib import Path
 from typing import Any
 
 import yaml
 
+from src.config import PROJECT_ROOT, SECOND_BRAIN_PATH
 from src.utils.m_ingest import IngestionPipeline
 from src.utils.m_log import f_log
+
+
+def _resolve_default_path() -> Path:
+    if SECOND_BRAIN_PATH:
+        path = Path(SECOND_BRAIN_PATH) / "capabilities"
+        if not path.exists():
+            raise OSError(f"SECOND_BRAIN_PATH is set to '{SECOND_BRAIN_PATH}' but '{path}' does not exist on disk.")
+        return path
+    return PROJECT_ROOT / "capabilities"
 
 
 class CapabilityRepository:
@@ -13,7 +24,10 @@ class CapabilityRepository:
     Triggers the AI Search Ingestion logic upon modification.
     """
 
-    def __init__(self, storage_path: str = "capabilities") -> None:
+    def __init__(self, storage_path: str | None = None) -> None:
+        if storage_path is None:
+            storage_path = str(_resolve_default_path())
+
         self.storage_path = storage_path
         self.ingester = IngestionPipeline(search_client=None)
 
