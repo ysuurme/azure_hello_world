@@ -18,7 +18,7 @@ def test_run_health_check_no_endpoint():
 def test_run_health_check_success_no_deployments(mock_client_manager):
     """Test successful health check when deployment listing is not available."""
     mock_cm = mock_client_manager.return_value
-    
+
     # Mock project client without inference
     mock_project_client = MagicMock()
     del mock_project_client.inference
@@ -45,7 +45,7 @@ def test_run_health_check_success_no_deployments(mock_client_manager):
 def test_run_health_check_success_with_deployments(mock_client_manager):
     """Test successful health check with deployment listing."""
     mock_cm = mock_client_manager.return_value
-    
+
     # Mock project client with inference and deployments
     mock_project_client = MagicMock()
     mock_deployment = MagicMock()
@@ -80,7 +80,7 @@ def test_run_health_check_empty_response(mock_client_manager):
     mock_cm.get_openai_client.return_value.__enter__.return_value = mock_openai_client
 
     mock_response = MagicMock()
-    mock_response.choices[0].message.content = "   " # Empty stripped
+    mock_response.choices[0].message.content = "   "  # Empty stripped
     mock_openai_client.chat.completions.create.return_value = mock_response
 
     with pytest.raises(SystemExit) as exc_info:
@@ -101,7 +101,7 @@ def test_run_health_check_fallback_max_tokens(mock_client_manager):
 
     mock_response = MagicMock()
     mock_response.choices[0].message.content = "OK"
-    
+
     # First call raises exception with max_completion_tokens
     def mock_create(*args, **kwargs):
         if "max_completion_tokens" in kwargs:

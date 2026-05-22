@@ -9,7 +9,7 @@ class TestDiagramEngine:
         Tests that valid D2 syntax produces a valid SVG output.
         """
         engine = DiagramEngine()
-        
+
         def mock_subprocess_run(cmd, *args, **kwargs):
             # cmd is [self.binary_path, input_file, output_file]
             output_file = cmd[2]
