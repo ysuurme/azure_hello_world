@@ -88,7 +88,7 @@ Use this module map to pinpoint the relevant files for your task and avoid loadi
 | `agents.workflow_dispatcher` | 1 (`ui.app`) | 2+ | deep module | Slash-command parser and capability-module router; sole entry point from `ui.app`. (ADR-010) |
 | `agents.diagram_studio` | 1 (`workflow_dispatcher`) | 4 | deep module | Diagram capability module: grill loop → DiagramBrief → D2 → sketch-rendered SVG. (ADR-011) |
 | `agents._refinement` | 1 (`diagram_studio`) | 0 | deep module | RefinementMixin encoding the grill pattern: read known → identify gaps → emit questions with recommendations. |
-| `agents.design_architecture` | 1 (`workflow_dispatcher`) | 1 (wraps `utils.m_orchestrator`) | deep module | **NEW (ADR-010)** — Wraps the existing intake → composer flow as a registered module under `/design`. |
+| `agents.design_architecture` | 1 (`workflow_dispatcher`) | 1 (wraps `utils.m_orchestrator`) | deep module | Wraps the existing intake → composer flow as a registered module under `/design`. (ADR-010) |
 
 ### Issue-Type → Files Index
 

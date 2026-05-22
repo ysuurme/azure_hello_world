@@ -6,12 +6,15 @@ class TestUITopology:
     @pytest.fixture
     def app_test(self):
         """Initializes the Streamlit AppTest framework for Headless UI validation."""
-        from unittest.mock import patch
+        from unittest.mock import MagicMock, patch
 
-        # Mock orchestrator to prevent real LLM network calls in tests
-        with patch(
-            "src.utils.m_orchestrator.AgenticOrchestrator.orchestrate_cycle", return_value=({}, "Mocked response")
-        ):
+        mock_result = MagicMock()
+        mock_result.response_text = "Mocked response"
+        mock_result.updated_state = {}
+        mock_result.artifacts = {}
+        mock_result.status = "completed"
+
+        with patch("src.agents.workflow_dispatcher.WorkflowDispatcher.dispatch", return_value=mock_result):
             at = AppTest.from_file("src/ui/app.py")
             yield at
 
@@ -22,15 +25,12 @@ class TestUITopology:
         """
         app_test.run(timeout=10)
 
-        # Verify app didn't crash during initialization
         assert not app_test.exception
 
-        # Verify Headers
         assert app_test.title[0].value == "Architecture Agent 🛡️"
         assert app_test.markdown[0].value == "### Technical Design Authority Agent"
 
-        # Verify Sidebar Configuration
-        assert app_test.sidebar.info[0].value == "Running Lean MVP locally with direct orchestrator bindings."
+        assert app_test.sidebar.info[0].value == "Running Lean MVP locally. All input routed via WorkflowDispatcher."
 
     def test_app_session_reset(self, app_test):
         """
@@ -39,14 +39,28 @@ class TestUITopology:
         app_test.run(timeout=10)
         assert len(app_test.session_state["chat_history"]) == 1
 
-        # Simulate typing a query
         app_test.chat_input[0].set_value("Analyze App Service").run()
 
-        # History should increase (User Message + Model Spinner/Response)
         assert len(app_test.session_state["chat_history"]) > 1
 
-        # Simulate pressing Reset
         app_test.sidebar.button[0].click().run()
 
-        # History length should revert to 1 (The welcome message)
         assert len(app_test.session_state["chat_history"]) == 1
+
+    def test_no_slash_input_routes_through_dispatcher(self, app_test):
+        """No-slash input must go through WorkflowDispatcher, not AgenticOrchestrator."""
+        from unittest.mock import MagicMock, patch
+
+        mock_result = MagicMock()
+        mock_result.response_text = "Help text"
+        mock_result.updated_state = {}
+        mock_result.artifacts = {}
+        mock_result.status = "unknown_command"
+
+        _target = "src.agents.workflow_dispatcher.WorkflowDispatcher.dispatch"
+        app_test.run(timeout=10)
+        with patch(_target, return_value=mock_result) as mock_dispatch:
+            app_test.chat_input[0].set_value("plain text no slash").run()
+            mock_dispatch.assert_called_once()
+            call_args = mock_dispatch.call_args[0]
+            assert call_args[0] == "plain text no slash"
