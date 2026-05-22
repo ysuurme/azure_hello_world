@@ -160,9 +160,7 @@ if ($ok) { exit 0 } else { Write-Host "Got: $out"; exit 1 }
 def test_script_strips_labels_with_regex_replace() -> None:
     """sync-issues.ps1 uses -replace to strip LABELS: header lines."""
     content = SCRIPT.read_text(encoding="utf-8")
-    assert "(?m)^LABELS:" in content, (
-        "sync-issues.ps1 must use -replace '(?m)^LABELS:...' to strip LABELS headers"
-    )
+    assert "(?m)^LABELS:" in content, "sync-issues.ps1 must use -replace '(?m)^LABELS:...' to strip LABELS headers"
 
 
 def test_script_strips_estimate_with_regex_replace() -> None:

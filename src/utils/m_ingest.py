@@ -39,14 +39,14 @@ class IngestionPipeline:
         """
         Mocks calling Azure Document Intelligence (Layout Model).
         """
-        f_log(f"Extracting layout and tables from {file_path}", c_type="process")
+        f_log(f"Extracting layout and tables from {file_path}", level="process")
         return "# Extracted Header\nThis is structured markdown representing a complex WAF architecture table."
 
     def ingest_local_markdown(self, docs_directory: str) -> None:
         """
         Main loop for Phase 1: local ingestion.
         """
-        f_log(f"Starting ingestion run from {docs_directory}", c_type="process")
+        f_log(f"Starting ingestion run from {docs_directory}", level="process")
         # In reality, this would os.walk the directory, load files,
         # chunk them, and use self.search_client.upload_documents
         pass

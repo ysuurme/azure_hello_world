@@ -35,11 +35,17 @@ class ArchitectureComposerAgent:
             "After the markdown, you MUST include a D2 diagram syntax block wrapped in ```d2 ... ``` "
             "that visualizes the architecture components and their relationships.\n\n"
             "### STRICT D2 SCHEMA RULES\n"
-            "To prevent compilation errors and adhere to Hexagonal/Clean Architecture, follow these syntactical rules:\n"
-            "1. Define components strictly with `shape` attributes (e.g., `component: {shape: cylinder}`). Do NOT use unsupported HTML tags.\n"
-            "2. Ensure all components are grouped logically into Bounded Contexts or Hexagonal layers (e.g., `Core Domain`, `Adapters`, `Infrastructure`).\n"
-            "3. Use `direction: right` or `direction: down` at the top of the diagram for consistent flow.\n"
-            "4. Enforce Hexagonal Architecture flow: External Triggers -> Application Adapters -> Domain Core. Dependency arrows (`->`) MUST point inwards.\n"
+            "To prevent compilation errors and adhere to Hexagonal/Clean Architecture, "
+            "follow these syntactical rules:\n"
+            "1. Define components strictly with `shape` attributes "
+            "(e.g., `component: {shape: cylinder}`). Do NOT use unsupported HTML tags.\n"
+            "2. Ensure all components are grouped logically into Bounded Contexts or "
+            "Hexagonal layers (e.g., `Core Domain`, `Adapters`, `Infrastructure`).\n"
+            "3. Use `direction: right` or `direction: down` at the top of the diagram "
+            "for consistent flow.\n"
+            "4. Enforce Hexagonal Architecture flow: External Triggers -> "
+            "Application Adapters -> Domain Core. "
+            "Dependency arrows (`->`) MUST point inwards.\n"
             "5. Apply standard colors/classes to indicate Azure components vs Core Logic where appropriate.\n"
             "6. Always include `classes: { ... }` or `theme: sketch` to style the diagram safely without raw CSS.\n"
             "If you fail to follow valid D2 syntax, the UI will crash. Use simple, robust node declarations."
@@ -49,12 +55,12 @@ class ArchitectureComposerAgent:
         """
         Context-Aware Search over the capabilities Markdown files.
         """
-        query = str(requirements.get('constraints', 'azure architecture'))
-        f_log(f"Retrieving capabilities for query: {query}", c_type="process")
-        
+        query = str(requirements.get("constraints", "azure architecture"))
+        f_log(f"Retrieving capabilities for query: {query}", level="process")
+
         # Use the local RAG search implementation
         search_results = knowledge_base_retrieve(query)
-        
+
         # Map back to expected format
         return [{"technology": res["id"].replace(".md", ""), "reason": res["content"]} for res in search_results]
 
@@ -62,13 +68,13 @@ class ArchitectureComposerAgent:
         """
         Executes the Composer step. Returns the final Markdown string natively via LLM.
         """
-        f_log("Composer received ready-requirements. Searching capabilities repo.", c_type="process")
+        f_log("Composer received ready-requirements. Searching capabilities repo.", level="process")
         selected_tech = self._retrieve_capabilities(requirements)
 
         # Use the chat completions client for LLM drafting.
         # Do not fallback to mocked output — raise on any missing/incompatible surfaces.
 
-        f_log("Drafting 5-point architecture via Azure Foundry...", c_type="process")
+        f_log("Drafting 5-point architecture via Azure Foundry...", level="process")
 
         # Checker Synergy: Price evaluation dynamically added
         tech_names = [tech.get("technology") for tech in selected_tech]
@@ -91,7 +97,7 @@ class ArchitectureComposerAgent:
 
         # Call AI Foundry Responses via OpenAI surface exclusively.
         try:
-            f_log("Calling AI Foundry Responses via OpenAI surface...", c_type="process")
+            f_log("Calling AI Foundry Responses via OpenAI surface...", level="process")
             with self.client_manager.get_openai_client() as openai_client:
                 combined_input = f"{self.system_prompt}\n\n{user_query}"
                 response = openai_client.responses.create(
@@ -101,7 +107,7 @@ class ArchitectureComposerAgent:
 
             return getattr(response, "output_text", None) or getattr(response, "text", None) or str(response)
         except Exception as e:
-            f_log(f"LLM Generation Failed: {e}", c_type="error")
+            f_log(f"LLM Generation Failed: {e}", level="error")
             return f"Error Generating Architecture: {e}"
 
     def generate_d2_syntax(self, markdown: str) -> str | None:

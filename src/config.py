@@ -20,7 +20,12 @@ AGENT_MODELS = {"intake_reviewer": "gpt-5-mini", "architecture_composer": "DeepS
 
 # --- Architecture RAG & Design ---
 TEMPLATE_PATH = PROJECT_ROOT / "architecture" / "000_architecture_template.md"
-DESIGNS_ARCHIVE_DIR = PROJECT_ROOT / "designs" / "approved"
+_SECOND_BRAIN_PATH = os.getenv("SECOND_BRAIN_PATH")
+DESIGNS_ARCHIVE_DIR = (
+    Path(_SECOND_BRAIN_PATH) / "architecture" / "designs" / "approved"
+    if _SECOND_BRAIN_PATH
+    else PROJECT_ROOT / "designs" / "approved"
+)
 
 # --- Executable Engines ---
 D2_BINARY_PATH = os.environ.get("D2_BINARY_PATH", "d2")
@@ -30,6 +35,20 @@ LOG_PROFILE = "PRD"  # "PRD" | "TEST" | "DEBUG"
 LOG_SEPARATOR_WIDTH = 80
 LOG_LINE_WIDTH = 120
 DIR_LOG = PROJECT_ROOT / "logs"
+
+
+class _Settings:
+    """Simple settings object that reads from environment variables."""
+
+    log_profile: str = os.getenv("LOG_PROFILE", LOG_PROFILE)
+    log_separator_width: int = LOG_SEPARATOR_WIDTH
+    log_line_width: int = LOG_LINE_WIDTH
+    log_dir: Path = DIR_LOG
+    port: int = int(os.getenv("PORT", "8080"))
+    google_api_key: str | None = os.getenv("GOOGLE_API_KEY")
+
+
+settings = _Settings()
 
 # --- Azure Authentication Mode ---
 # Controls whether the app should prefer interactive Azure CLI login (default)

@@ -3,6 +3,13 @@ param(
     [string]$ProjectName = "@hello_architect"
 )
 
+function Strip-MetadataHeaders([string]$Body) {
+    $Body = $Body -replace '(?m)^LABELS:\s*.+(\r?\n|$)', ''
+    $Body = $Body -replace '(?m)^ESTIMATE:\s*\d+(\r?\n|$)', ''
+    $Body = $Body -replace '(?m)^PRIORITY:\s*P[0-4](\r?\n|$)', ''
+    return $Body.TrimStart()
+}
+
 $IssuesFile = "$PSScriptRoot\..\..\ISSUES.md"
 
 Write-Host "🚀 Starting GitHub Issue Sync using PowerShell..." -ForegroundColor Cyan
@@ -21,7 +28,7 @@ $IssuesCreated = 0
 
 foreach ($Match in $Matches) {
     $Title = $Match.Groups[1].Value.Trim()
-    $BodyText = $Match.Groups[2].Value.Trim()
+    $BodyText = Strip-MetadataHeaders $Match.Groups[2].Value.Trim()
 
     if ($DryRun) {
         Write-Host "DRY RUN: Would create issue '$Title'" -ForegroundColor Yellow

@@ -45,11 +45,11 @@ class IntakeReviewerAgent:
         """
         Executes the intake review process, invoking live Azure OpenAI if client exists.
         """
-        f_log(f"IntakeReviewer reviewing prompt: {user_prompt[:50]}...", c_type="process")
+        f_log(f"IntakeReviewer reviewing prompt: {user_prompt[:50]}...", level="process")
 
         # Call AI Foundry Responses via OpenAI surface exclusively.
         try:
-            f_log("Calling AI Foundry Responses via OpenAI surface...", c_type="process")
+            f_log("Calling AI Foundry Responses via OpenAI surface...", level="process")
             with self.client_manager.get_openai_client() as openai_client:
                 # Combine system prompt + user input into a single input for Responses
                 combined_input = f"{self.system_prompt}\n\n{user_prompt}"
@@ -63,6 +63,6 @@ class IntakeReviewerAgent:
             clean_json = raw_output.replace("```json", "").replace("```", "").strip()
             return json.loads(clean_json)
         except Exception as e:
-            f_log(f"Azure Inference Failure: {str(e)}", c_type="error")
+            f_log(f"Azure Inference Failure: {str(e)}", level="error")
             error_msg = f"I encountered a service fault analyzing your request: {e}"
             return {"status": "needs_clarification", "questions": [error_msg]}

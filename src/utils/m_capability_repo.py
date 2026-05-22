@@ -21,7 +21,7 @@ class CapabilityRepository:
             os.makedirs(self.storage_path)
 
     def write_capability(self, filename: str, frontmatter: dict[str, Any], body: str) -> str:
-        f_log(f"Writing capability {filename}", c_type="process")
+        f_log(f"Writing capability {filename}", level="process")
         full_path = os.path.join(self.storage_path, filename)
 
         yaml_content = yaml.dump(frontmatter, sort_keys=False)
@@ -37,6 +37,6 @@ class CapabilityRepository:
         """
         Idempotent sync hook to Azure AI Search.
         """
-        f_log(f"Triggering ingestion for {file_path}", c_type="process")
+        f_log(f"Triggering ingestion for {file_path}", level="process")
         # In actual deployment, invoke search ingest logic here
         self.ingester.ingest_local_markdown(self.storage_path)

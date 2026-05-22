@@ -24,20 +24,20 @@ class AgenticOrchestrator:
         Manages the transition state without blocking the Streamlit UI.
         Returns a tuple: (State Update Dict, Output Text/Markdown).
         """
-        f_log("Orchestrator initiating MAF lifecycle.", c_type="process")
+        f_log("Orchestrator initiating MAF lifecycle.", level="process")
 
         # Step 1: Route to Intake Reviewer
         intake_response = self.reviewer.review_input(user_prompt)
 
         if intake_response.get("status") == "needs_clarification":
-            f_log("MAF halted at Intake phase: Clarification needed.", c_type="warning")
+            f_log("MAF halted at Intake phase: Clarification needed.", level="warning")
             # Update State machine to wait for input
             session_state["phase"] = "CLARIFYING"
             questions = "\n".join([f"- {q}" for q in intake_response.get("questions", [])])
             return session_state, f"To help me design this architecture perfectly, please clarify:\n{questions}"
 
         elif intake_response.get("status") == "ready":
-            f_log("MAF progressing to Composer phase.", c_type="success")
+            f_log("MAF progressing to Composer phase.", level="success")
             session_state["phase"] = "GENERATION"
             requirements = intake_response.get("requirements", {})
 
@@ -45,7 +45,7 @@ class AgenticOrchestrator:
             markdown_output = self.composer.generate_architecture(requirements)
             return session_state, markdown_output
 
-        f_log("Unhandled MAF State.", c_type="error")
+        f_log("Unhandled MAF State.", level="error")
         return session_state, "Unknown state occurred in Orchestrator."
 
     def get_d2_syntax(self, markdown: str) -> str | None:

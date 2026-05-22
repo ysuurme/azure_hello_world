@@ -18,7 +18,7 @@ class DiagramEngine:
         """
         Takes raw .d2 syntactical mapping, compiles it, and returns the SVG bytes.
         """
-        f_log("Compiling D2 syntax to SVG via local binary.", c_type="process")
+        f_log("Compiling D2 syntax to SVG via local binary.", level="process")
 
         # Use a secure temporary directory native to python
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -35,12 +35,12 @@ class DiagramEngine:
                 with open(output_file, "rb") as f:
                     svg_bytes = f.read()
 
-                f_log("SVG compiled successfully.", c_type="success")
+                f_log("SVG compiled successfully.", level="success")
                 return svg_bytes
 
             except subprocess.CalledProcessError as e:
-                f_log(f"D2 compilation failed: {e.stderr}", c_type="error")
+                f_log(f"D2 compilation failed: {e.stderr}", level="error")
                 return None
             except FileNotFoundError:
-                f_log("D2 binary not found. Ensure it is mapped in the Dockerfile.", c_type="error")
+                f_log("D2 binary not found. Ensure it is mapped in the Dockerfile.", level="error")
                 return None

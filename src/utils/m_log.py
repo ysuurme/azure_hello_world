@@ -141,9 +141,7 @@ def setup_logging(profile: str | None = None) -> None:
 
     console_handler = logging.StreamHandler()
     console_handler.setLevel(_PROFILE_LEVELS[active_profile])
-    console_handler.setFormatter(
-        logging.Formatter(fmt=_PROFILE_FORMATS[active_profile], datefmt="%H:%M:%S")
-    )
+    console_handler.setFormatter(logging.Formatter(fmt=_PROFILE_FORMATS[active_profile], datefmt="%H:%M:%S"))
     _logger.addHandler(console_handler)
 
     settings.log_dir.mkdir(parents=True, exist_ok=True)

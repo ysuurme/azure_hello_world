@@ -25,7 +25,7 @@ def fetch_retail_price(resource: str) -> float | str:
             return _get_fallback_static_price(resource)
         return items[0].get("retailPrice", 0.0)
     except Exception as e:
-        f_log(f"Cost API failure for {resource}: {e}", c_type="error")
+        f_log(f"Cost API failure for {resource}: {e}", level="error")
         return "Error retrieving live price"
 
 
@@ -34,6 +34,6 @@ def calculate_cost(resources: list[str]) -> dict[str, Any]:
     Queries the live Azure Retail Prices API to establish estimated costs.
     Moves the agent from Searchbot to Financial Architect.
     """
-    f_log(f"Calculating estimated costs for resources: {resources}", c_type="process")
+    f_log(f"Calculating estimated costs for resources: {resources}", level="process")
     costs = {res: fetch_retail_price(res) for res in resources}
     return {"trade_off_matrix_data": costs, "currency": "USD", "billing_period": "Monthly Estimated (Base)"}

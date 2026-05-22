@@ -21,13 +21,7 @@ from pathlib import Path
 import pytest
 
 PWSH = shutil.which("pwsh") or "pwsh"
-SCRIPT = (
-    Path(__file__).parent.parent.parent
-    / ".github"
-    / "scripts"
-    / "kanban"
-    / "architecture.ps1"
-)
+SCRIPT = Path(__file__).parent.parent.parent / ".github" / "scripts" / "kanban" / "architecture.ps1"
 
 pytestmark = pytest.mark.skipif(
     not shutil.which("pwsh"),
@@ -67,28 +61,19 @@ def _make_src(tmp_path: Path, n_py_files: int) -> Path:
 
 def test_gate_exactly_five_is_trivial(tmp_path: Path) -> None:
     src = _make_src(tmp_path, 5)
-    result = _ps(
-        _GATE_SNIPPET
-        + f"if (Test-FileCountGate '{src}') {{ exit 1 }} else {{ exit 0 }}"
-    )
+    result = _ps(_GATE_SNIPPET + f"if (Test-FileCountGate '{src}') {{ exit 1 }} else {{ exit 0 }}")
     assert result.returncode == 0, "5 .py files must NOT trigger the non-trivial path"
 
 
 def test_gate_six_is_nontrivial(tmp_path: Path) -> None:
     src = _make_src(tmp_path, 6)
-    result = _ps(
-        _GATE_SNIPPET
-        + f"if (Test-FileCountGate '{src}') {{ exit 0 }} else {{ exit 1 }}"
-    )
+    result = _ps(_GATE_SNIPPET + f"if (Test-FileCountGate '{src}') {{ exit 0 }} else {{ exit 1 }}")
     assert result.returncode == 0, "6 .py files must trigger the non-trivial path"
 
 
 def test_gate_zero_files_is_trivial(tmp_path: Path) -> None:
     src = _make_src(tmp_path, 0)
-    result = _ps(
-        _GATE_SNIPPET
-        + f"if (Test-FileCountGate '{src}') {{ exit 1 }} else {{ exit 0 }}"
-    )
+    result = _ps(_GATE_SNIPPET + f"if (Test-FileCountGate '{src}') {{ exit 1 }} else {{ exit 0 }}")
     assert result.returncode == 0, "0 .py files must NOT trigger the non-trivial path"
 
 
@@ -98,10 +83,7 @@ def test_gate_counts_recursively(tmp_path: Path) -> None:
     (src / "sub").mkdir(parents=True)
     for i in range(6):
         (src / "sub" / f"m_{i}.py").write_text("", encoding="utf-8")
-    result = _ps(
-        _GATE_SNIPPET
-        + f"if (Test-FileCountGate '{src}') {{ exit 0 }} else {{ exit 1 }}"
-    )
+    result = _ps(_GATE_SNIPPET + f"if (Test-FileCountGate '{src}') {{ exit 0 }} else {{ exit 1 }}")
     assert result.returncode == 0, "Nested .py files must count toward the gate"
 
 
@@ -121,9 +103,7 @@ def test_trivial_blast_radius_one_liner(tmp_path: Path) -> None:
     assert result.returncode == 0
     assert out.exists(), "BLAST_RADIUS.md must be created"
     content = out.read_text(encoding="utf-8").strip()
-    assert content == "trivial codebase, no architectural risk computed", (
-        f"Unexpected content: {content!r}"
-    )
+    assert content == "trivial codebase, no architectural risk computed", f"Unexpected content: {content!r}"
 
 
 def test_trivial_blast_radius_has_no_graph_data(tmp_path: Path) -> None:
@@ -133,9 +113,7 @@ def test_trivial_blast_radius_has_no_graph_data(tmp_path: Path) -> None:
     content = out.read_text(encoding="utf-8").lower()
     # Graph keywords that would indicate a fake graph was generated
     for keyword in ("fan-in", "fan_in", "module graph", "pydeps"):
-        assert keyword not in content, (
-            f"Trivial BLAST_RADIUS.md must not contain '{keyword}'"
-        )
+        assert keyword not in content, f"Trivial BLAST_RADIUS.md must not contain '{keyword}'"
 
 
 # ── State.json helpers ────────────────────────────────────────────────────────
@@ -176,10 +154,7 @@ def _read_state(plan_root: Path, issue: int) -> dict:
 
 
 def test_state_json_created_on_first_call(tmp_path: Path) -> None:
-    result = _ps(
-        _STATE_SNIPPET
-        + f"Set-PipelineState -IssueNumber 99 -Phase 'refining' -PlanRoot '{tmp_path}'"
-    )
+    result = _ps(_STATE_SNIPPET + f"Set-PipelineState -IssueNumber 99 -Phase 'refining' -PlanRoot '{tmp_path}'")
     assert result.returncode == 0, result.stderr
     state = _read_state(tmp_path, 99)
     assert state["issue"] == 99
@@ -205,23 +180,15 @@ def test_state_json_accumulates_transitions(tmp_path: Path) -> None:
 
 def test_state_json_transitions_is_array(tmp_path: Path) -> None:
     """transitions must always be a JSON array, even with a single entry."""
-    result = _ps(
-        _STATE_SNIPPET
-        + f"Set-PipelineState -IssueNumber 7 -Phase 'architecting' -PlanRoot '{tmp_path}'"
-    )
+    result = _ps(_STATE_SNIPPET + f"Set-PipelineState -IssueNumber 7 -Phase 'architecting' -PlanRoot '{tmp_path}'")
     assert result.returncode == 0, result.stderr
     raw = (tmp_path / "7" / "state.json").read_text(encoding="utf-8")
     parsed = json.loads(raw)
-    assert isinstance(parsed["transitions"], list), (
-        "transitions must be a JSON array even with one entry"
-    )
+    assert isinstance(parsed["transitions"], list), "transitions must be a JSON array even with one entry"
 
 
 def test_state_json_issue_number_correct(tmp_path: Path) -> None:
-    result = _ps(
-        _STATE_SNIPPET
-        + f"Set-PipelineState -IssueNumber 123 -Phase 'refining' -PlanRoot '{tmp_path}'"
-    )
+    result = _ps(_STATE_SNIPPET + f"Set-PipelineState -IssueNumber 123 -Phase 'refining' -PlanRoot '{tmp_path}'")
     assert result.returncode == 0, result.stderr
     state = _read_state(tmp_path, 123)
     assert state["issue"] == 123
@@ -263,9 +230,7 @@ def test_safe_str_exactly_five_no_truncation() -> None:
     result = _ps(_SAFE_STR_SNIPPET + f"$safe = @({mods_ps})\nGet-SafeStr -safe $safe")
     assert result.returncode == 0, result.stderr
     output = result.stdout.strip()
-    assert "more" not in output, (
-        f"5 modules must not produce a truncation indicator, got: {output!r}"
-    )
+    assert "more" not in output, f"5 modules must not produce a truncation indicator, got: {output!r}"
     for m in mods:
         assert m in output
 
