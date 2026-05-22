@@ -27,6 +27,28 @@ Architecture Composition Engine            Knowledge Repository & Daily Cockpit
 
 ---
 
+## Repository Structure
+
+```
+my_template_repo/
+├── copier.yml                    Prompt definitions and generation config
+├── LICENSE
+├── README.md                     This file
+├── main.py                       Entry point (templated)
+├── pyproject.toml                Project metadata and dependencies
+├── src/
+│   ├── config.py                 Centralised config (pydantic-settings, loads .env)
+│   └── utils/                    Generic transferable modules (m_*.py)
+├── tests/                        Pytest suite, mirrors src/ hierarchy
+├── .agents/skills/               Skill system — AI workflow for every generated project
+├── .github/workflows/            CI: lint + typecheck + test
+├── docs/adr/                     Architecture Decision Records (MADR format)
+├── CONTEXT.md                    Domain glossary template (filled at generation time)
+└── AGENTS.md                     Agent standing instructions (filled at generation time)
+```
+
+---
+
 ## Core Architecture
 
 1. **Lean Boundary Mediation**: Streamlit natively invokes the `AgenticOrchestrator` synchronously, decoupled from Azure Function trigger overhead for rapid local development.
@@ -248,21 +270,22 @@ LOCAL_AI_MODEL=nerdsking-python-coder-3b-i
 
 ## Project Governance
 
-> **All agents (Gemini, Claude, or other) must read `AI.md` on startup.** It is the single source of truth for project rules, architecture, coding standards, and driver-specific delegation behaviour.
+> **All agents (Gemini, Claude, or other) must read `AGENTS.md` and `CONTEXT.md` on startup.** They are the single source of truth for project rules, architecture, coding standards, and driver-specific delegation behaviour.
 
 | File | Role |
 |------|------|
-| `AI.md` | **Primary agent instruction file.** Rules, architecture, model delegation (Gemini + Claude drivers), safety boundaries. Read this first. |
+| `AGENTS.md` | **Primary agent instruction file.** Rules, model delegation (Gemini + Claude drivers), safety boundaries. Read this first. |
+| `CONTEXT.md` | **Domain context and codebase topography.** Architectural glossary, system map, component fan-in/fan-out. |
 | `.agents/skills/` | Coding enforcement protocols (`review-code`, `design-architecture`, `design-infrastructure`, `git-workflow`). |
 | `Taskfile.yml` | Single source of truth for all commands. `task --list` to discover. |
-| `TODO.md` | **Single source of truth for the project roadmap.** All future improvements, features, and bugs are written here. |
+| `ISSUES.md` | **Single source of truth for the project roadmap.** All future improvements, features, and bugs are written here. |
 
 ### Adding Improvements
 
-All future work — features, bugs, refactors — must be captured as `ISSUE:…END_ISSUE` blocks in `TODO.md`. After syncing, the block is automatically removed from `TODO.md` to prevent duplicate uploads.
+All future work — features, bugs, refactors — must be captured as `ISSUE:…END_ISSUE` blocks in `ISSUES.md`. After syncing, the block is automatically removed from `ISSUES.md` to prevent duplicate uploads.
 
 ```
-1. Write the issue in TODO.md (Goal / Description / Requirements / Acceptance Criteria)
+1. Write the issue in ISSUES.md (Goal / Description / Requirements / Acceptance Criteria)
 2. Run `task sync` to push to GitHub and the @hello_architect project
 3. Label with `agent:dev` for automated execution, or work it manually
 ```
