@@ -17,9 +17,11 @@ class WorkflowDispatcher:
     """Routes slash-command input to the matching registered capability module."""
 
     def __init__(self, client_manager) -> None:
+        from src.agents.design_architecture import DesignArchitectureModule
         from src.agents.diagram_studio import DiagramStudioModule
 
         self._modules: dict[str, object] = {
+            "/design": DesignArchitectureModule(client_manager=client_manager),
             "/diagram": DiagramStudioModule(client_manager=client_manager),
         }
 
