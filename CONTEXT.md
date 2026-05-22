@@ -81,14 +81,13 @@ Use this module map to pinpoint the relevant files for your task and avoid loadi
 | `utils.m_health_check` | 0 | 4 | deep module | Validates environment, credentials, and API readiness. |
 | `utils.m_ingest` | 0 | 2 | deep module | Idempotent RAG ingestion pipeline via Azure AI Search. |
 | `utils.m_log` | 0 | 4 | deep module | Centralized logging and telemetry wrapping. |
-| `utils.m_orchestrator` | 0 | 4 | deep module | The state machine governing Maker-Checker loop transitions. |
 | `utils.m_persist_design` | 0 | 4 | deep module | Persists approved markdown and SVG deliverables to the `designs/` directory. |
 | `utils.m_search` | 0 | 1 | deep module | Abstraction for executing semantic queries against AI Search. |
 | `utils.m_tools` | 0 | 2 | deep module | Function calling capabilities for agents (e.g., `calculate_cost`). |
 | `agents.workflow_dispatcher` | 1 (`ui.app`) | 2+ | deep module | Slash-command parser and capability-module router; sole entry point from `ui.app`. (ADR-010) |
 | `agents.diagram_studio` | 1 (`workflow_dispatcher`) | 4 | deep module | Diagram capability module: grill loop → DiagramBrief → D2 → sketch-rendered SVG. (ADR-011) |
 | `agents._refinement` | 1 (`diagram_studio`) | 0 | deep module | RefinementMixin encoding the grill pattern: read known → identify gaps → emit questions with recommendations. |
-| `agents.design_architecture` | 1 (`workflow_dispatcher`) | 1 (wraps `utils.m_orchestrator`) | deep module | Wraps the existing intake → composer flow as a registered module under `/design`. (ADR-010) |
+| `agents.design_architecture` | 1 (`workflow_dispatcher`) | 5 (`intake_reviewer`, `architecture_composer`, `utils.m_diagram_engine`, `utils.m_persist_design`, `utils.m_ai_client`) | deep module | Owns the `/design` lifecycle: intake review → composer → SVG render → archive. (ADR-010) |
 
 ### Issue-Type → Files Index
 
@@ -97,7 +96,7 @@ Use this module map to pinpoint the relevant files for your task and avoid loadi
 | Adding a new capability module | `docs/adr/ADR-010-workflow-dispatcher.md`, `docs/adr/ADR-011-diagram-studio-sketch.md` (reference implementation), `src/agents/workflow_dispatcher.py`, `src/agents/diagram_studio.py` |
 | Changing dispatch / slash-command behaviour | `docs/adr/ADR-010-workflow-dispatcher.md`, `src/agents/workflow_dispatcher.py`, `tests/agents/test_workflow_dispatcher.py` |
 | Changing diagram rendering / sketch behaviour | `docs/adr/ADR-011-diagram-studio-sketch.md`, `src/utils/m_diagram_engine.py`, `src/agents/diagram_studio.py` |
-| Changing architecture-design flow (intake → composer) | `src/agents/design_architecture.py`, `src/utils/m_orchestrator.py`, `src/agents/intake_reviewer.py`, `src/agents/architecture_composer.py` |
+| Changing architecture-design flow (intake → composer) | `src/agents/design_architecture.py`, `src/agents/intake_reviewer.py`, `src/agents/architecture_composer.py` |
 | Persistence of designs / diagrams | `src/utils/m_persist_design.py`, `src/config.py` (`DESIGNS_ARCHIVE_DIR`) |
 
 ## Architectural Constraints
