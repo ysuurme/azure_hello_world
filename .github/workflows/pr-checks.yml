@@ -16,5 +16,7 @@ jobs:
         run: |
           uv run ruff check .
           uv run ruff format --check .
+      - name: Install d2
+        run: curl -fsSL https://d2lang.com/install.sh | sh -s --
       - name: Test
         run: uv run pytest -n auto --cov=src --cov-report=term-missing --cov-fail-under=80
