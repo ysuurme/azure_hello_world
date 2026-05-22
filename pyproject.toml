@@ -17,7 +17,9 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+    "pytest-cov>=4.1.0",
     "ruff>=0.15.9",
+    "pip-audit>=2.7.3",
 ]
 
 [tool.pytest.ini_options]
