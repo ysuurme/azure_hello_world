@@ -1,84 +1,84 @@
 """
-Centralized logging module for the project.
+Centralized logging module.
 
 Provides:
-- setup_logging()      : One-time configuration (called from main.py)
-- f_log()              : Single logging function used by all modules
-- f_log_start_end()    : Decorator for function start/end timing
-- f_log_execution()    : Program-level execution timer
+- setup_logging()   : One-time configuration (call from main.py)
+- f_log()           : Single logging function used across all modules
+- f_log_calls()     : Decorator for function entry/exit timing
+- f_log_execution() : Program-level execution timer
 
-Logging profiles (set LOG_PROFILE in config.py):
-- PRD   : Emoji stage markers + warnings/errors only
+Logging profiles (set LOG_PROFILE in .env):
+- PRD   : Stage markers + warnings/errors only
 - TEST  : All INFO-level messages
 - DEBUG : Full execution detail with module names
 """
 
 ###############################################################################
-# SYSTEM MODULES
+# IMPORTS
 ###############################################################################
 
 import logging
 import textwrap
 import time
+from enum import StrEnum
 from functools import wraps
 
-import src.config as config
-from src.config import DIR_LOG, LOG_LINE_WIDTH, LOG_PROFILE, LOG_SEPARATOR_WIDTH
-
-###############################################################################
-# CONFIGURATION CONSTANTS (Self-Contained)
-###############################################################################
-
-# Configurations now actively sourced globally from config.py
+from src.config import settings
 
 ###############################################################################
 # CONSTANTS
 ###############################################################################
 
-# Custom log level for pipeline stage markers (between INFO=20 and WARNING=30)
+# Custom log level for stage markers (sits between INFO=20 and WARNING=30)
 STAGE = 25
 logging.addLevelName(STAGE, "STAGE")
 
-# Semantic emoji vocabulary — auto-prepended by f_log() when c_type is a key
-STAGE_EMOJI = {
-    "start": "🚀",  # Request received or pipeline kickoff
-    "retrieve": "🔍",  # Knowledge base retrieval
-    "reasoning": "🧠",  # Agent thinking or synthesizing
-    "critique": "🛡️",  # Sentinel Maker/Checker evaluation
-    "process": "⚙️",  # General processing or API calls
-    "success": "✅",  # Step completed successfully
-    "complete": "🎉",  # Final pipeline success
-    "gate_fail": "🚫",  # Security/Cost gate rejection
+
+class LogLevel(StrEnum):
+    DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
+    START = "start"
+    PROCESS = "process"
+    SUCCESS = "success"
+    STORE = "store"
+    REGISTER = "register"
+    COMPLETE = "complete"
+    GATE_FAIL = "gate_fail"
+
+
+# Emoji auto-prepended for stage-level entries
+STAGE_EMOJI: dict[LogLevel, str] = {
+    LogLevel.START: "🚀",
+    LogLevel.PROCESS: "⚙️",
+    LogLevel.SUCCESS: "✅",
+    LogLevel.STORE: "💾",
+    LogLevel.REGISTER: "📦",
+    LogLevel.COMPLETE: "🎉",
+    LogLevel.GATE_FAIL: "🚫",
 }
 
-# Maps LOG_PROFILE to console handler level
-_PROFILE_LEVELS = {
-    "PRD": STAGE,  # 25: stage markers + warning + error + critical
-    "TEST": logging.INFO,  # 20: all info messages + above
-    "DEBUG": logging.DEBUG,  # 10: everything
+_STAGE_LEVELS: set[LogLevel] = set(STAGE_EMOJI)
+
+_PROFILE_LEVELS: dict[str, int] = {
+    "PRD": STAGE,
+    "TEST": logging.INFO,
+    "DEBUG": logging.DEBUG,
 }
 
-# Console format per profile
-_PROFILE_FORMATS = {
+_PROFILE_FORMATS: dict[str, str] = {
     "PRD": "%(message)s",
     "TEST": "%(asctime)s - %(levelname)s - %(message)s",
     "DEBUG": "%(asctime)s - %(levelname)s - %(name)s - %(message)s",
 }
 
-# Maps standard c_type strings to logging levels
-_TYPE_TO_LEVEL = {
-    "debug": logging.DEBUG,
-    "info": logging.INFO,
-    "warning": logging.WARNING,
-    "error": logging.ERROR,
-    "critical": logging.CRITICAL,
-}
+# Guard against double configuration
+_is_configured: bool = False
 
-# Module-level flag to prevent double configuration
-_is_configured = False
-
-# Logger instance used by all f_log calls
-_logger = logging.getLogger("azure_agent")
+# Single named logger — replace "app" with your project name
+_logger = logging.getLogger("app")
 
 ###############################################################################
 # FORMATTER
@@ -86,33 +86,23 @@ _logger = logging.getLogger("azure_agent")
 
 
 class IndentedFormatter(logging.Formatter):
-    """
-    Custom formatter that wraps long lines and indents continuation lines
-    for readability in log files.
-    """
+    """Wraps long lines and indents continuation lines for log file readability."""
 
     def format(self, record: logging.LogRecord) -> str:
         formatted = super().format(record)
-
-        # Split by the standard " - " delimiter to find message start
         parts = formatted.split(" - ", 2)
-        if len(parts) < 3 or len(formatted) <= LOG_LINE_WIDTH:
+        if len(parts) < 3 or len(formatted) <= settings.log_line_width:
             return formatted
 
         prefix = f"{parts[0]} - {parts[1]} - "
-        message = parts[2]
-        available_width = LOG_LINE_WIDTH - len(prefix)
-
         wrapped = textwrap.fill(
-            message,
-            width=available_width,
+            parts[2],
+            width=settings.log_line_width - len(prefix),
             initial_indent="",
             subsequent_indent=" " * len(prefix),
             break_long_words=False,
             break_on_hyphens=False,
         )
-
-        # Re-attach prefix to first line only
         lines = wrapped.split("\n")
         lines[0] = prefix + lines[0]
         return "\n".join(lines)
@@ -123,52 +113,42 @@ class IndentedFormatter(logging.Formatter):
 ###############################################################################
 
 
-def setup_logging(profile: str = None) -> None:
+def setup_logging(profile: str | None = None) -> None:
     """
-    One-time logging configuration. Call from main.py before any f_log() calls.
+    One-time logging configuration. Call once from main.py before any f_log() calls.
 
     Sets up two handlers:
-    - Console: level and format determined by LOG_PROFILE
-    - File: always captures DEBUG-level to log/application.log
+    - Console : level and format driven by LOG_PROFILE
+    - File    : always captures DEBUG-level to logs/application.log
 
     Parameters
     ----------
     profile : str, optional
-        Override for LOG_PROFILE from config.py. One of "PRD", "TEST", "DEBUG".
+        Override LOG_PROFILE from .env. One of "PRD", "TEST", "DEBUG".
     """
     global _is_configured
-
     if _is_configured:
         return
 
-    active_profile = profile or LOG_PROFILE
-
-    # Validate profile
+    active_profile = profile or settings.log_profile
     if active_profile not in _PROFILE_LEVELS:
         active_profile = "PRD"
 
-    # Clear any existing handlers on root logger to avoid duplicates
-    for handler in logging.root.handlers[:]:
-        logging.root.removeHandler(handler)
+    for handler in _logger.handlers[:]:
+        _logger.removeHandler(handler)
+    _logger.setLevel(logging.DEBUG)
+    _logger.propagate = True
 
-    # Set root logger to DEBUG so handlers control filtering
-    logging.root.setLevel(logging.DEBUG)
-
-    # --- Console Handler ---
     console_handler = logging.StreamHandler()
     console_handler.setLevel(_PROFILE_LEVELS[active_profile])
     console_handler.setFormatter(
-        logging.Formatter(
-            fmt=_PROFILE_FORMATS[active_profile],
-            datefmt="%H:%M:%S",
-        )
+        logging.Formatter(fmt=_PROFILE_FORMATS[active_profile], datefmt="%H:%M:%S")
     )
-    logging.root.addHandler(console_handler)
+    _logger.addHandler(console_handler)
 
-    # --- File Handler ---
-    DIR_LOG.mkdir(parents=True, exist_ok=True)
+    settings.log_dir.mkdir(parents=True, exist_ok=True)
     file_handler = logging.FileHandler(
-        filename=DIR_LOG / "application.log",
+        filename=settings.log_dir / "application.log",
         mode="a",
         encoding="utf-8",
     )
@@ -179,23 +159,16 @@ def setup_logging(profile: str = None) -> None:
             datefmt="%Y-%m-%d %H:%M:%S",
         )
     )
-    logging.root.addHandler(file_handler)
+    _logger.addHandler(file_handler)
 
-    # --- Suppress noisy third-party loggers ---
-    for noisy_logger in ("azure", "urllib3", "httpx"):
-        logging.getLogger(noisy_logger).setLevel(logging.WARNING)
-
-    # Startup informational log for TEST profile: indicate chosen Azure auth mode
-    if active_profile == "TEST":
-        auth_mode = "service_principal" if getattr(config, "USE_AZURE_SERVICE_PRINCIPAL", False) else "cli"
-        azure_auth_mode = getattr(config, "AZURE_AUTH_MODE", "cli")
-        _logger.info(f"Startup: Azure auth mode selected: {auth_mode} (AZURE_AUTH_MODE={azure_auth_mode})")
+    for noisy in ("httpx", "urllib3", "git"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
     _is_configured = True
 
 
 def _ensure_setup() -> None:
-    """Lazy initialization guard for standalone script execution."""
+    """Lazy initialisation guard — allows f_log() without an explicit setup_logging() call."""
     if not _is_configured:
         setup_logging()
 
@@ -205,71 +178,53 @@ def _ensure_setup() -> None:
 ###############################################################################
 
 
-def log_new_request(request_title: str) -> None:
-    """Log the start of a new user request with clear separators and timestamp.
-
-    Parameters
-    ----------
-    request_title: str
-        Human‑readable title describing the request (e.g. "User initiated Analysis from Streamlit").
-    """
-    # Use the 'start' stage emoji and separator lines for visibility
-    f_log(request_title, c_type="start", c_before="=", c_after="=")
-
-
 def f_log(
-    c_message: str,
-    c_type: str = "info",
-    b_raise: bool = False,
-    c_before: str = None,
-    c_after: str = None,
+    message: str,
+    level: str | LogLevel = LogLevel.INFO,
+    raise_exc: bool = False,
+    sep_before: str | None = None,
+    sep_after: str | None = None,
 ) -> None:
     """
     Central logging function for all project modules.
 
     Parameters
     ----------
-    c_message : str
-        Message to log.
-    c_type : str
-        Log type. Standard: "debug", "info", "warning", "error", "critical".
+    message : str
+        The message to log.
+    level : str | LogLevel
+        Standard: "debug", "info", "warning", "error", "critical".
         Stage (emoji auto-prepended): "start", "process", "success",
         "store", "register", "complete", "gate_fail".
-    b_raise : bool
-        Raise Exception after logging error/critical messages.
-    c_before : str
-        Character for separator line before the message (e.g. "=", "-").
-    c_after : str
-        Character for separator line after the message (e.g. "=", "-").
+    raise_exc : bool
+        Raise Exception after logging when level is "error" or "critical".
+    sep_before : str, optional
+        Separator character repeated across full width before the message.
+    sep_after : str, optional
+        Separator character repeated across full width after the message.
     """
     _ensure_setup()
 
-    # Determine log level and format message
-    if c_type in STAGE_EMOJI:
-        level = STAGE
-        formatted_message = f"{STAGE_EMOJI[c_type]} {c_message}"
-    elif c_type in _TYPE_TO_LEVEL:
-        level = _TYPE_TO_LEVEL[c_type]
-        formatted_message = c_message
+    try:
+        level = LogLevel(level)
+    except ValueError:
+        level = LogLevel.INFO
+
+    if level in _STAGE_LEVELS:
+        log_level = STAGE
+        formatted = f"{STAGE_EMOJI[level]} {message}"
     else:
-        # Fallback: unknown c_type defaults to INFO
-        level = logging.INFO
-        formatted_message = c_message
+        log_level = logging.getLevelName(level.upper())
+        formatted = message
 
-    # Log separator before
-    if c_before is not None:
-        _logger.log(level, c_before * LOG_SEPARATOR_WIDTH)
+    if sep_before is not None:
+        _logger.log(log_level, sep_before * settings.log_separator_width)
+    _logger.log(log_level, formatted)
+    if sep_after is not None:
+        _logger.log(log_level, sep_after * settings.log_separator_width)
 
-    # Log the message
-    _logger.log(level, formatted_message)
-
-    # Log separator after
-    if c_after is not None:
-        _logger.log(level, c_after * LOG_SEPARATOR_WIDTH)
-
-    # Raise exception for error/critical when requested
-    if c_type in ("error", "critical") and b_raise:
-        raise Exception(c_message)
+    if level in (LogLevel.ERROR, LogLevel.CRITICAL) and raise_exc:
+        raise Exception(message)
 
 
 ###############################################################################
@@ -277,22 +232,22 @@ def f_log(
 ###############################################################################
 
 
-def f_log_start_end(c_separator: str = "-"):
+def f_log_calls(separator: str = "-"):
     """
-    Decorator to log the start and end of a function call.
+    Decorator that logs entry and exit of a function call.
 
     Parameters
     ----------
-    c_separator : str
-        Character for separator lines around the log messages.
+    separator : str
+        Character used for separator lines around the log messages.
     """
 
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            f_log(f"Start {func.__name__}()", c_before=c_separator)
+            f_log(f"Start {func.__name__}()", sep_before=separator)
             result = func(*args, **kwargs)
-            f_log(f"Ended {func.__name__}()", c_after=c_separator)
+            f_log(f"End   {func.__name__}()", sep_after=separator)
             return result
 
         return wrapper
@@ -304,48 +259,39 @@ def f_log_start_end(c_separator: str = "-"):
 # EXECUTION TIMER
 ###############################################################################
 
-# Stores start times per project for f_log_execution
 _start_times: dict[str, float] = {}
 
 
-def f_log_execution(c_project: str, b_start: bool = True) -> None:
+def f_log_execution(project: str, start: bool = True) -> None:
     """
-    Log start or end of a program execution with elapsed time.
+    Log the start or end of a program run with elapsed time.
 
     Parameters
     ----------
-    c_project : str
-        Project name (displayed in uppercase).
-    b_start : bool
-        True to log start and begin timing; False to log end with elapsed time.
+    project : str
+        Project identifier (displayed in uppercase in log output).
+    start : bool
+        True to record start time; False to log elapsed time since start.
     """
-    action = "Start" if b_start else "End"
+    action = "Start" if start else "End"
 
-    if b_start:
-        _start_times[c_project] = time.time()
+    if start:
+        _start_times[project] = time.time()
+        f_log(f"{action} of {project.upper()}.", sep_before="=", sep_after="=")
+        return
+
+    f_log(f"{action} of {project.upper()}.", sep_before="=", sep_after="-")
+
+    if project not in _start_times:
         f_log(
-            f"{action} of the {c_project.upper()} program.",
-            c_before="=",
-            c_after="=",
+            "No start time recorded. Call f_log_execution(start=True) first.",
+            level=LogLevel.WARNING,
+            sep_after="=",
         )
         return
 
+    elapsed = time.time() - _start_times.pop(project)
     f_log(
-        f"{action} of the {c_project.upper()} program.",
-        c_before="=",
-        c_after="-",
-    )
-
-    if c_project not in _start_times:
-        f_log(
-            "No start time recorded. Call f_log_execution with b_start=True first.",
-            c_type="warning",
-            c_after="=",
-        )
-        return
-
-    elapsed = time.time() - _start_times.pop(c_project)
-    f_log(
-        f"Total execution time: {elapsed:.2f} seconds ({elapsed / 60:.2f} minutes)",
-        c_after="=",
+        f"Total execution time: {elapsed:.2f}s ({elapsed / 60:.2f} min)",
+        sep_after="=",
     )

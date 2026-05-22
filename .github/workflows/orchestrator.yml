@@ -1,0 +1,364 @@
+name: Orchestrator
+
+# AFK pipeline: label-driven implement → review → merge flow.
+# Requires secrets: GH_TOKEN (classic PAT, project scope), CLAUDE_CODE_OAUTH_TOKEN.
+#
+# Trigger summary:
+#   agent:backlog  → implement job (skip if HITL label is present)
+#   agent:review   → merge job (squash-merge + CONTEXT.md update)
+#   workflow_dispatch → manual single-stage run
+#
+# Queue behaviour:
+#   The implement job uses a concurrency group so only one run executes at a time.
+#   Subsequent agent:backlog label events queue (up to one pending run). A drain step
+#   at the end of each run re-dispatches if further backlog items remain, ensuring no
+#   issues are silently dropped when the queue depth exceeds one.
+
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Issue number to process (0 or empty = auto-pick oldest agent:backlog)
+        required: false
+        default: '0'
+        type: string
+      stage:
+        description: Pipeline stage to run
+        required: true
+        type: choice
+        options: [implement, merge]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+env:
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+jobs:
+
+  # ── Implement (full pipeline: implement → review loop → merge) ───────────────
+  implement:
+    name: Implement
+    if: >-
+      (github.event_name == 'issues' &&
+       github.event.label.name == 'agent:backlog' &&
+       !contains(github.event.issue.labels.*.name, 'HITL')) ||
+      (github.event_name == 'workflow_dispatch' &&
+       github.event.inputs.stage == 'implement')
+    # Self-hosted runner on the user's machine — uv, claude, git, and auth are
+    # all pre-installed. No dependency install steps needed per run.
+    runs-on: [self-hosted, gha-project]
+    # Serialize all pipeline runs — only one executes at a time; the next queues.
+    # cancel-in-progress: false ensures a queued run waits rather than being cancelled.
+    concurrency:
+      group: implement-pipeline
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      KANBAN_PROJECT_NUMBER: ${{ vars.KANBAN_PROJECT_NUMBER }}
+      KANBAN_PROJECT_OWNER: ${{ vars.KANBAN_PROJECT_OWNER }}
+      KANBAN_PROJECT_ID: ${{ vars.KANBAN_PROJECT_ID }}
+      KANBAN_STATUS_FIELD_ID: ${{ vars.KANBAN_STATUS_FIELD_ID }}
+      KANBAN_OPT_BACKLOG: ${{ vars.KANBAN_OPT_BACKLOG }}
+      KANBAN_OPT_IMPLEMENTING: ${{ vars.KANBAN_OPT_IMPLEMENTING }}
+      KANBAN_OPT_REVIEW: ${{ vars.KANBAN_OPT_REVIEW }}
+      KANBAN_OPT_MERGED: ${{ vars.KANBAN_OPT_MERGED }}
+      KANBAN_ESTIMATE_FIELD_ID: ${{ vars.KANBAN_ESTIMATE_FIELD_ID }}
+      KANBAN_PRIORITY_FIELD_ID: ${{ vars.KANBAN_PRIORITY_FIELD_ID }}
+      KANBAN_PRIORITY_OPT_P0: ${{ vars.KANBAN_PRIORITY_OPT_P0 }}
+      KANBAN_PRIORITY_OPT_P1: ${{ vars.KANBAN_PRIORITY_OPT_P1 }}
+      KANBAN_PRIORITY_OPT_P2: ${{ vars.KANBAN_PRIORITY_OPT_P2 }}
+      KANBAN_PRIORITY_OPT_P3: ${{ vars.KANBAN_PRIORITY_OPT_P3 }}
+      KANBAN_PRIORITY_OPT_P4: ${{ vars.KANBAN_PRIORITY_OPT_P4 }}
+      TRIGGERED_ISSUE: ${{ github.event.issue.number || github.event.inputs.issue_number }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Resolve backlog issue
+        id: resolve
+        run: |
+          $issue = $env:TRIGGERED_ISSUE
+          if (-not $issue -or $issue -eq '0') {
+            $issue = gh issue list --repo $env:GITHUB_REPOSITORY `
+              --label 'agent:backlog' --state open `
+              --json number --jq 'sort_by(.number) | .[0].number // empty' 2>$null
+          } else {
+            $hasLabel = gh issue view $issue --repo $env:GITHUB_REPOSITORY `
+              --json labels --jq '[.labels[].name] | contains(["agent:backlog"])' 2>$null
+            if ($hasLabel -ne 'true') {
+              Write-Output "Issue #$issue no longer has agent:backlog — picking oldest remaining."
+              $issue = gh issue list --repo $env:GITHUB_REPOSITORY `
+                --label 'agent:backlog' --state open `
+                --json number --jq 'sort_by(.number) | .[0].number // empty' 2>$null
+            }
+          }
+          $issue = if ($issue) { $issue.Trim() } else { '' }
+          if (-not $issue) {
+            Write-Output "No agent:backlog issues found — nothing to do."
+            "issue_number=" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+          } else {
+            Write-Output "Resolved issue #$issue"
+            "issue_number=$issue" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
+
+      - name: Run full pipeline (refine → architecture → implement → review → merge)
+        if: steps.resolve.outputs.issue_number != ''
+        env:
+          PIPELINE_ISSUE: ${{ steps.resolve.outputs.issue_number }}
+        run: |
+          # Phase A   — refine (implement.ps1 Invoke-Refine)
+          # Phase A.5 — architecture (architecture.ps1 Invoke-Architecture):
+          #             emits .planning/<issue>/BLAST_RADIUS.md,
+          #             posts blast-radius PR comment, records state transitions.
+          # Phase B   — develop (implement.ps1 Invoke-Develop via Claude Code)
+          # Phase C   — commit + PR (implement.ps1 Invoke-CommitAndPR)
+          pwsh -File .github/scripts/kanban/run.ps1 -Issue $env:PIPELINE_ISSUE -MaxRetries 3
+
+      - name: Drain remaining backlog
+        if: always() && steps.resolve.outputs.issue_number != ''
+        run: |
+          $remaining = gh issue list --repo $env:GITHUB_REPOSITORY `
+            --label 'agent:backlog' --state open `
+            --json number --jq 'length' 2>$null
+          $remaining = if ($remaining) { [int]$remaining.Trim() } else { 0 }
+          if ($remaining -gt 0) {
+            Write-Output "$remaining remaining agent:backlog issue(s) — dispatching next drain run."
+            gh workflow run orchestrator.yml `
+              --repo $env:GITHUB_REPOSITORY `
+              --field stage=implement `
+              --field issue_number=0
+          } else {
+            Write-Output "Backlog fully drained."
+          }
+
+  # ── Merge ────────────────────────────────────────────────────────────────────
+  merge:
+    name: Squash-merge and update CONTEXT.md
+    if: >-
+      (github.event_name == 'issues' &&
+       github.event.label.name == 'agent:review') ||
+      (github.event_name == 'workflow_dispatch' &&
+       github.event.inputs.stage == 'merge')
+    runs-on: ubuntu-latest
+    # Same concurrency group as implement: if the pipeline job is still running
+    # (it already holds this slot), this job queues. By the time it starts, the
+    # pipeline has already merged and the "already merged" guard below exits cleanly.
+    concurrency:
+      group: implement-pipeline
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      ISSUE_NUMBER: ${{ github.event.issue.number || github.event.inputs.issue_number }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Skip if already merged by pipeline
+        id: already-merged
+        run: |
+          LABELS=$(gh issue view "$ISSUE_NUMBER" --json labels \
+            --jq '[.labels[].name]' 2>/dev/null)
+          if echo "$LABELS" | grep -q '"agent:merged"'; then
+            echo "Issue #$ISSUE_NUMBER already merged by pipeline — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve PR for issue
+        id: resolve-pr
+        if: steps.already-merged.outputs.skip != 'true'
+        run: |
+          # Derive expected branch name following kanban convention:
+          # feature/{number}-word1-word2-word3 (stop-words filtered, first 3 content words)
+          ISSUE_TITLE=$(gh issue view "$ISSUE_NUMBER" --json title --jq '.title')
+          STOP_WORDS="a an the and or for to of in on at with via by from fix feat add update remove"
+          WORDS=""
+          COUNT=0
+          for W in $ISSUE_TITLE; do
+            LC=$(printf '%s' "$W" | tr '[:upper:]' '[:lower:]' | tr -dc '[:alnum:]')
+            if [ -n "$LC" ] && ! printf '%s\n' $STOP_WORDS | grep -qx "$LC" && [ "$COUNT" -lt 3 ]; then
+              WORDS="${WORDS}-${LC}"
+              COUNT=$((COUNT + 1))
+            fi
+          done
+          BRANCH="feature/${ISSUE_NUMBER}${WORDS}"
+
+          PR_NUMBER=$(gh pr list --head "$BRANCH" --state open \
+            --json number --jq '.[0].number // empty' 2>/dev/null)
+
+          if [ -z "$PR_NUMBER" ]; then
+            PR_NUMBER=$(gh pr list --state open \
+              --json number,closingIssuesReferences \
+              --jq ".[] | select(.closingIssuesReferences[].number == $ISSUE_NUMBER) | .number" \
+              2>/dev/null | head -1)
+          fi
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "::error::No open PR found for issue #${ISSUE_NUMBER} (branch: ${BRANCH})"
+            exit 1
+          fi
+
+          echo "pr_number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "Resolved PR #${PR_NUMBER} for issue #${ISSUE_NUMBER}"
+
+      - name: Wait for CI checks and squash-merge
+        id: squash-merge
+        if: steps.already-merged.outputs.skip != 'true'
+        run: |
+          PR_NUMBER=${{ steps.resolve-pr.outputs.pr_number }}
+          DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name')
+
+          gh pr checks "$PR_NUMBER" --watch
+
+          gh pr merge "$PR_NUMBER" --squash --delete-branch
+
+          git fetch origin "$DEFAULT_BRANCH"
+          git checkout "$DEFAULT_BRANCH"
+          git reset --hard "origin/${DEFAULT_BRANCH}"
+
+          echo "default_branch=${DEFAULT_BRANCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Apply agent:merged label and post merge comment
+        if: success() && steps.already-merged.outputs.skip != 'true'
+        run: |
+          PR_NUMBER=${{ steps.resolve-pr.outputs.pr_number }}
+
+          CURRENT=$(gh issue view "$ISSUE_NUMBER" --json labels \
+            --jq '[.labels[].name | select(startswith("agent:"))] | first // empty' 2>/dev/null)
+
+          if [ -n "$CURRENT" ] && [ "$CURRENT" != "null" ] && [ "$CURRENT" != "agent:merged" ]; then
+            gh issue edit "$ISSUE_NUMBER" \
+              --remove-label "$CURRENT" --add-label 'agent:merged'
+          else
+            gh issue edit "$ISSUE_NUMBER" --add-label 'agent:merged' 2>/dev/null || true
+          fi
+
+          gh issue comment "$ISSUE_NUMBER" \
+            --body "✅ PR #${PR_NUMBER} merged. Issue complete."
+
+      # ── Post-merge CONTEXT.md update (ported from merge.ps1 Invoke-ContextUpdate)
+      - name: Update CONTEXT.md after merge
+        if: success() && steps.already-merged.outputs.skip != 'true'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Static prompt template — dynamic sections are appended at runtime
+          CONTEXT_UPDATE_PROMPT: |-
+            You are updating CONTEXT.md for a software project after a PR was merged.
+
+            Analyse the merged diff, the issue body, and the current CONTEXT.md.
+            Produce targeted patches to any of the three sections below if new content is warranted:
+              1. Glossary         — new domain terms introduced by this change
+              2. Bounded Contexts — ownership changes if new modules or contexts were added
+              3. Out of Scope     — decisions explicitly deferred or rejected during implementation
+
+            STRICT OUTPUT RULES:
+            - Return ONLY a valid unified diff for CONTEXT.md, starting with "--- a/CONTEXT.md" and "+++ b/CONTEXT.md".
+            - OR return the exact string NO_CHANGES (and nothing else) if no section needs updating.
+            - Do NOT include markdown code fences, explanations, or any other text.
+            - Do NOT reword or duplicate existing entries.
+            - The patch MUST be directly applicable via: git apply
+        run: |
+          set +e  # Failure here is non-blocking — the merge already succeeded
+          DEFAULT_BRANCH=${{ steps.squash-merge.outputs.default_branch }}
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          # AFK path (cloud runner) is opt-in via CLAUDE_CODE_OAUTH_TOKEN.
+          # Without it the cloud runner has no Claude auth and no way to run
+          # the update. HITL merges via local `task` invocations run
+          # merge.ps1's Invoke-ContextUpdate against the developer's local
+          # Claude installation — those keep working independently of this
+          # step. Skip silently here (no warning comment) so AFK pipelines
+          # stay quiet when the token is intentionally absent.
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::notice::CLAUDE_CODE_OAUTH_TOKEN not set — skipping post-merge CONTEXT.md update (HITL merges handle this locally)."
+            exit 0
+          fi
+
+          _fail() {
+            echo "::warning::Post-merge CONTEXT.md update failed: ${1}"
+            gh issue comment "$ISSUE_NUMBER" \
+              --body "⚠️ Post-merge CONTEXT.md update failed — manual update may be needed. Run: ${RUN_URL}"
+            exit 0
+          }
+
+          if [ ! -f CONTEXT.md ]; then
+            _fail "CONTEXT.md not found"
+          fi
+
+          DIFF=$(git show HEAD 2>/dev/null) || _fail "git show HEAD failed"
+          ISSUE_BODY=$(gh issue view "$ISSUE_NUMBER" --json body --jq '.body' 2>/dev/null) \
+            || _fail "gh issue view failed"
+
+          # Install Claude CLI if not present and token is available.
+          # sudo: ubuntu-latest npm global prefix is /usr/local/lib/node_modules,
+          # which requires elevated perms. Without sudo the install silently
+          # fails and `command -v claude` returns nothing.
+          # The stderr is no longer redirected to /dev/null so install errors
+          # surface in the workflow log if they occur.
+          if ! command -v claude &>/dev/null; then
+            if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+              sudo npm install -g @anthropic-ai/claude-code || true
+            fi
+          fi
+
+          if ! command -v claude &>/dev/null; then
+            _fail "claude CLI not available after install attempt"
+          fi
+
+          PROMPT_FILE=$(mktemp)
+          {
+            printf '%s\n' "$CONTEXT_UPDATE_PROMPT"
+            printf '\nMERGED DIFF:\n%s\n\nISSUE BODY:\n%s\n\nCURRENT CONTEXT.md:\n' \
+              "$DIFF" "$ISSUE_BODY"
+            cat CONTEXT.md
+          } > "$PROMPT_FILE"
+
+          RESPONSE=$(cat "$PROMPT_FILE" | claude --print 2>/dev/null)
+          CLAUDE_EXIT=$?
+          rm -f "$PROMPT_FILE"
+
+          if [ "$CLAUDE_EXIT" -ne 0 ] || [ -z "$RESPONSE" ]; then
+            _fail "claude --print exited ${CLAUDE_EXIT}"
+          fi
+
+          # Check for NO_CHANGES (strip all whitespace for robust comparison)
+          if [ "$(printf '%s' "$RESPONSE" | tr -d '[:space:]')" = "NO_CHANGES" ]; then
+            gh issue comment "$ISSUE_NUMBER" \
+              --body "✅ CONTEXT.md up-to-date — no update needed."
+            exit 0
+          fi
+
+          PATCH_FILE=$(mktemp)
+          printf '%s' "$RESPONSE" > "$PATCH_FILE"
+          git apply "$PATCH_FILE" 2>/dev/null
+          APPLY_EXIT=$?
+          rm -f "$PATCH_FILE"
+
+          if [ "$APPLY_EXIT" -ne 0 ]; then
+            _fail "git apply failed — malformed Claude response"
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add CONTEXT.md
+          git commit -m "chore(context): update after merge of #${ISSUE_NUMBER}" \
+            2>/dev/null || _fail "git commit failed"
+
+          git push origin "$DEFAULT_BRANCH" 2>/dev/null \
+            || _fail "git push to ${DEFAULT_BRANCH} failed"
+
+          COMMIT_SHA=$(git rev-parse HEAD)
+          gh issue comment "$ISSUE_NUMBER" \
+            --body "📝 CONTEXT.md updated after merge (${COMMIT_SHA})"

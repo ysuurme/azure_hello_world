@@ -1,200 +1,159 @@
 ---
 name: write-skills
-description: Use when creating new skills, editing existing skills, or verifying skills work before deployment
+description: Use when creating new skills, editing existing skills, splitting an overgrown skill, or validating a skill before deployment
 ---
 
-# Writing Skills for Antigravity/Gemini Agents
+# Writing Skills for Agents
 
 ## Overview
 
-**Development Skills vs. Documentation Skills:**
-- **Development Skills** (e.g., Code Review, Design Infrastructure, Design Architecture): A **strong emphasis on Test-Driven Development (TDD)** must be enforced. You write test cases (pressure scenarios), watch them fail, write the skill, watch agents comply, and refactor loopholes. If you didn't watch an agent fail without the skill, you don't know if the skill teaches the right thing.
-- **Documentation Skills** (e.g., this `write-skills` SKILL.md): The focus is strictly on **structure, clarity, and best practices** tailored specifically for the Antigravity/Gemini execution environment, ensuring readability and strict adherence to architectural standards.
+A **skill** is a constraint document for AI agents — a reference that prevents hallucinated approaches by encoding proven patterns and hard rules. Skills are reusable across projects and sessions.
 
-**Personal skills live in agent-specific directories (e.g., `<project-root>/.agents/skills/`)** 
+**Primary artifact:** Valid, MECE-compliant SKILL.md plus its companion REFERENCE.md, EXAMPLES.md, and optionally `scripts/`.
 
-**REQUIRED BACKGROUND:** You MUST understand Test-Driven Development principles before using this skill. This skill adapts TDD strictly to Development skills, and structural rigor to Documentation skills.
+**Skills are:** Proven techniques, hard constraints, patterns, tool references.
+**Skills are NOT:** Project-specific conventions, one-off solutions, or rules enforceable by a script or linter.
 
-## What is a Skill?
+See [REFERENCE.md](REFERENCE.md) for the full SKILL.md template, routing-signal rules, ASO rules, and the baseline-first protocol in depth. See [EXAMPLES.md](EXAMPLES.md) for a worked end-to-end skill creation.
 
-A **skill** is a reference guide for proven techniques, patterns, or tools that an AI Agent can natively read via `view_file`. Skills help future Agent instances find and apply effective approaches without hallucinating paths.
+## Scope
 
-**Skills are:** Reusable techniques, patterns, tools, reference guides.
-**Skills are NOT:** Narratives about how you solved a problem once or project-specific constraints.
+**Owns:** Skill creation standards, SKILL.md / REFERENCE.md / EXAMPLES.md / `scripts/` directory shape, validation process (baseline → draft → verify), MECE enforcement and split/gap detection against the AGENTS.md Skills index and each existing skill's Scope block, routing signal format, update and split guidance, ASO rules.
 
-## TDD Mapping for Skills
+**Does not own:** Project-specific agent instructions (→ `CONTEXT.md` / `AGENTS.md`), individual skill content.
 
-| TDD Concept | Skill Creation |
-|-------------|----------------|
-| **Test case** | Pressure scenario / Problem statement |
-| **Production code** | Skill document (`SKILL.md`) |
-| **Test fails (RED)** | Agent violates rule or hallucinate approaches without skill (baseline) |
-| **Test passes (GREEN)** | Agent complies strictly with skill present |
-| **Refactor** | Close logic loopholes while maintaining compliance |
-| **Write test first** | Run baseline scenario BEFORE writing skill |
-| **Watch it fail** | Document exact rationalizations the agent uses |
-| **Minimal code** | Write skill addressing those specific violations |
-| **Watch it pass** | Verify the agent now complies |
-| **Refactor cycle** | Plug loopholes → re-verify |
-
-## When to Create a Skill
-**Create when:**
-- A process or technique wasn't intuitively obvious to the Agent.
-- You'd reference this approach again across multiple projects.
-- The pattern applies broadly.
-- Other AI agents would benefit from this deterministic behavior.
-
-**Don't create for:**
-- One-off solutions.
-- Standard practices well-documented on the public web (use `search_web` instead).
-- Project-specific conventions (put in `USER_RULES` or `AGENT.md`/Workspace rules).
-- Mechanical constraints if it can be codified via a bash script or validation hook instead.
-
-## Skill Types
-
-### Technique
-Concrete method with steps to follow (e.g., `condition-based-waiting`, `root-cause-tracing`).
-
-### Pattern
-A way of framing architectural architectures (e.g., `flatten-with-flags`, `test-invariants`).
-
-### Reference
-Syntax guides, CLI tooling definitions, API documentation.
-
-## Directory Structure
-
-```
-.agents/
-  skills/
-    skill-name/
-      SKILL.md              # Main reference (required)
-      supporting-file.*     # Only if needed
-```
-
-**Keep inline within `SKILL.md`:**
-- Principles and concepts
-- Code patterns (< 50 lines)
-- Bulleted implementation plans
-
-## `SKILL.md` Structure
-
-**Frontmatter (YAML):**
-- Two required fields: `name` and `description`
-- Max 1024 characters total
-- `name`: Use letters, numbers, and hyphens only
-- `description`: Third-person, describes ONLY when to use (NOT what it does)
-  - Start with "Use when..." to focus on triggering conditions
-  - Include specific symptoms, situations, and contexts
-  - **NEVER summarize the skill's workflow in the description**
-
-```markdown
----
-name: Skill-Name-With-Hyphens
-description: Use when [specific triggering conditions and symptoms]
----
-
-# Skill Name
-
-## Overview
-What is this? Core principle in 1-2 sentences.
+**Interfaces with:** All other skills — this skill defines the contract every other skill must follow.
 
 ## When to Use
-Bullet list with SYMPTOMS and use cases. Include when NOT to use.
+
+- Creating a new skill
+- Editing or adding constraints to an existing skill
+- Detecting whether a skill needs splitting (scope creep check)
+- Validating a skill before deploying it
+
+**Do NOT create a skill for:**
+- Project-specific conventions (→ `CONTEXT.md` / `AGENTS.md`)
+- One-off solutions that won't recur across projects
+- Rules enforceable by a linter, hook, or script
 
 ## Core Pattern
-Before/after code comparison.
+
+### The Iron Law
+
+**No skill without a failing baseline first.** Applies to new skills AND edits.
+
+1. Run the pressure scenario — verify the agent gets it wrong
+2. Document the exact rationalizations used — these become your constraints
+3. Write the skill closing those specific loopholes
+4. Verify compliance
+
+Write skill before baseline? Delete it. Start over. No exceptions: don't keep it as "reference," don't adapt it while writing.
+
+**Closing loopholes:** State the rule AND forbid the specific workaround. A rule without a closed escape route will be rationalized away.
+
+### The MECE Law
+
+**REQUIRED:** Before writing or updating any skill, read the Skills index in `AGENTS.md` and the `Scope` block (`Owns` / `Does not own` / `Interfaces with`) of every adjacent skill the new content might overlap with.
+
+Every skill must be mutually exclusive and collectively exhaustive within the skill system the AGENTS.md index defines.
+
+- **Mutually exclusive:** No `Owns` entry in one skill duplicates an `Owns` entry in another
+- **Collectively exhaustive:** Every concern in the domain has exactly one skill that owns it
+
+**MECE alarm — flag immediately when:**
+- A new `Owns` entry already appears in another skill's Scope → resolve overlap before writing
+- A constraint needs qualifying "except when X" more than twice → split signal
+- Only half the skill is relevant for the task at hand → split signal
+- A new independent trigger condition is being added to an existing skill → split signal
+
+When a MECE alarm fires, stop and resolve it before continuing. Do not write around it.
 
 ## Quick Reference
-Table or bullets for scanning common operations.
 
-## Implementation
-Inline code for simple patterns, or link to supporting file.
+### Directory Shape — Anthropic Open Skill Spec
 
-## Common Mistakes
-What goes wrong + fixes.
+Every skill directory MUST conform to:
+
+```
+.agents/skills/
+  skill-name/
+    SKILL.md              # Required — overview, scope, quick start. Hard cap: 500 lines.
+    REFERENCE.md          # Required — deep-dive content overflowed from SKILL.md
+    EXAMPLES.md           # Required — at least one runnable end-to-end example sequence
+    scripts/              # Required when the skill implies deterministic operations (stubs allowed)
+    supporting-file.*     # Only if needed
 ```
 
-## Agent Search Optimization (ASO)
+**Hard rules:**
+- `SKILL.md` ≤ 500 physical lines. Overflow content moves to REFERENCE.md.
+- `EXAMPLES.md` contains ≥ 1 runnable example sequence — copy-pasteable commands, prompts, or concrete artifacts. Prose-only descriptions do not count.
+- `scripts/` is omitted only when the skill is pure documentation/process with no deterministic operation to script. When present, Phase-2 stubs that `throw` are acceptable while the logic is pending.
 
-**Critical for discovery:** The Agent needs to FIND your skill during its tasks.
+**What goes where:**
+- `SKILL.md`: frontmatter, overview, scope, When-to-Use triggers, Core Pattern, quick-reference tables, common mistakes
+- `REFERENCE.md`: full decision trees, complete schema templates, metric tables, step-by-step procedures
+- `EXAMPLES.md`: end-to-end example sequences with real commands or concrete artifacts
+- `scripts/`: deterministic operations the skill implies
 
-### 1. Rich Description Field
-
-**Purpose:** Agents read the description from standard metadata parsing to decide which skills to `<view_file>` for a given task. 
-Make it answer: "Should I read this skill right now?"
-
-**Format:** Start with "Use when..." to focus on triggering conditions.
-
-**CRITICAL: Description = When to Use, NOT What the Skill Does**
-The description should ONLY describe triggering conditions. Do NOT summarize the skill's process or workflow in the description.
-If you summarize the workflow, the agent will take the shortcut and try to hallucinate the rest without reading the `SKILL.md` document natively.
+### Frontmatter Rules
 
 ```yaml
-# ❌ BAD: Summarizes workflow - Agent may follow this instead of reading skill
-description: Use when executing plans - dispatches tool calls with code review between tasks
+---
+name: skill-name-with-hyphens       # letters, numbers, hyphens only
+description: Use when [triggering conditions only — never summarize the workflow]
+---
+```
 
-# ✅ GOOD: Just triggering conditions, no workflow summary
+Description = triggering conditions only. Summarizing the workflow lets the agent shortcut the skill body.
+
+```yaml
+# ❌ Summarizes workflow — agent skips the skill body
+description: Use when executing plans — dispatches tool calls with code review between tasks
+
+# ✅ Triggering conditions only — agent reads the skill
 description: Use when executing implementation plans with independent tasks in the current session
 ```
 
-### 2. Keyword Coverage
-Use words the Agent would actively search for:
-- Tools: Actual command line names (e.g., `git`, `uv`, `pytest`).
-- Error messages: "Hook timed out", "race condition".
-- Synonyms: "timeout/hang/freeze".
+### Checklists
 
-### 3. Token Efficiency (Critical)
-Always optimize your word count.
-- Move details to CLI tool help logs instead of pasting 2,000 lines of `man` pages into a markdown file.
-- Use explicit cross-references when necessary (`**REQUIRED:** See other-skill`).
-- Compress examples to single, meaningful Python/Bash implementations.
+**Create:**
+1. Run baseline — verify agent fails, document exact failure modes
+2. Write frontmatter (`name`, `description` — triggering conditions only)
+3. Write Scope block (`Owns`, `Does not own`, `Interfaces with`)
+4. Write constraints closing the specific loopholes from step 1 only
+5. Author `REFERENCE.md` (deep content) and `EXAMPLES.md` (≥1 runnable sequence). Add `scripts/` if the skill implies deterministic operations.
+6. Add the skill to the `## Skills` index in `AGENTS.md` with links to its REFERENCE.md and EXAMPLES.md
+7. Validate — agent re-attempts scenario; if a new loophole is found, return to step 1 for it
 
-### 4. Naming Convention
-Write skill names by what you DO or the core insight:
-- ✅ `condition-based-waiting` over `async-test-helpers`
-- ✅ `root-cause-tracing` over `debugging-techniques`
+**Update:**
+1. Run baseline — verify agent fails with the current skill
+2. Check MECE alarm conditions — does the fix expand scope or trigger a split?
+3. Add constraints closing the specific gap; if content overflows, push to REFERENCE.md or add an example to EXAMPLES.md
+4. Validate — passes new scenario AND all previous scenarios
 
-## Creating the Iron Law (Test First)
+**Split:**
+1. Confirm two independent scopes — each must have its own standalone trigger
+2. Create two new skill directories, each conforming to the four-file shape above
+3. Distribute existing content — no duplication allowed
+4. Delete the original skill directory
+5. Update every skill (and `AGENTS.md`) that referenced the original
 
-`NO SKILL WITHOUT A FAILING TEST FIRST`
-- This applies to NEW skills AND EDITS to existing skills.
-- Write a skill before testing? Delete it. Start over.
-- Provide a failing scenario, check if the Agent executes it wrong, and THEN supply the `.agents/skills/` documentation.
+### AGENTS.md Index
 
-### Bulletproofing Skills Against Rationalization
-Skills that enforce discipline need to resist rationalization. AI Agents are highly logic-driven and try to find loopholes when minimizing operations.
+Every skill must appear in the `## Skills` section of `AGENTS.md`. Where `REFERENCE.md` and `EXAMPLES.md` exist, they are linked in the References column. A skill that ships without an index entry is invisible to the agent.
 
-**Close Every Loophole Explicitly:**
-Don't just state the rule - forbid specific workarounds.
+## Common Mistakes
 
-<Bad>
-Write code before test? Delete it.
-</Bad>
+**Writing skill before baseline.** Delete it. Start over. The baseline defines what the skill must prevent — without it the constraints are guesses.
 
-<Good>
-Write code before test? Delete it. Start over.
-**No exceptions:**
-- Don't keep it as "reference"
-- Don't "adapt" it while writing tests
-- Delete means delete
-</Good>
+**Description summarizes workflow instead of trigger.** Ask: "does this tell the agent WHEN to use the skill, or WHAT it does?" Rewrite if the latter.
 
-## Skill Creation Checklist
+**`Does not own` entries without routing pointers.** Every exclusion must name where that concern lives — see Routing Signals in [REFERENCE.md](REFERENCE.md).
 
-**Phase 1 - Baseline:**
-- Create a pressure scenario prompt and ask the Agent to execute it.
-- Verify the Agent fails or hallucinates behavior without the explicit skill.
+**Scope too broad** ("Owns: everything in this domain"). Scope must be specific enough that a second skill in the same domain has a non-overlapping `Owns` list.
 
-**Phase 2 - Draft Constraint:**
-- Name the skill using hyphens.
-- Add YAML frontmatter with `name` and `description` ("Use when...").
-- Keep the overview clear and problem-focused.
-- Write explicit constraints closing the specific loopholes the Agent used.
+**Scope creep on update.** Re-read the Scope block before every update. If new content doesn't fit in `Owns`, update Scope explicitly or route to the correct skill. If it triggers a MECE alarm, stop and split.
 
-**Phase 3 - Validation:**
-- Let the Agent read `SKILL.md` and attempt the same previous prompt.
-- Verify the Agent strictly adheres to the skill guidelines.
-- Commit to the `.agents/skills/` project directory.
+**Shipping without REFERENCE.md / EXAMPLES.md.** A SKILL.md without its companion files is incomplete per the open skill spec. EXAMPLES.md in particular is what an agent reads to learn the *shape* of compliant output — without it, the constraint hits but the worked pattern is missing.
 
-## The Bottom Line
-Creating skills under `.agents/skills/` creates reusable, deterministic behavior across projects. Use the same discipline applied to coding: identify the failure, code the solution, test the boundary. Apply this rigor to your organizational documentation.
+**SKILL.md over 500 lines.** The cap is hard. Long-tail content (decision trees, full templates, deep procedures) belongs in REFERENCE.md.

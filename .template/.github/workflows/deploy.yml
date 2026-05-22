@@ -1,0 +1,89 @@
+name: Deploy container image
+
+# Single dispatch entry point. The target cloud is selected by the repository
+# variable `DEPLOY_TARGET` (set once at project setup) — exactly one job
+# below activates per run.
+#
+# HITL prerequisite — Workload Identity Federation must be provisioned by a human
+# before the first run of this workflow. WIF setup cannot be automated from inside
+# CI because it requires elevated cloud-side privileges (Owner / User Access
+# Administrator on Azure; iam.workloadIdentityPoolAdmin + iam.serviceAccountAdmin
+# on GCP). See SECURITY.md § "Provisioning WIF for Azure" / "Provisioning WIF for
+# GCP" for the one-time human steps. The repository secrets/variables consumed
+# below are populated as the final step of that procedure.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
+      image_tag:
+        description: GHCR image tag to deploy (use the SHA tag from build.yml for pinned deployments)
+        required: false
+        default: latest
+        type: string
+
+jobs:
+  deploy-azure:
+    if: vars.DEPLOY_TARGET == 'azure'
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    permissions:
+      id-token: write  # Required for Workload Identity Federation
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # HITL: AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_SUBSCRIPTION_ID are
+      # produced by the one-time human WIF provisioning steps in
+      # SECURITY.md § "Provisioning WIF for Azure". Missing values here mean
+      # WIF has not yet been provisioned — do not attempt to auto-create them.
+      - name: Authenticate to Azure via Workload Identity Federation
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update Azure Container App image
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az containerapp update \
+              --name "${{ vars.AZURE_CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --image "ghcr.io/${{ github.repository }}:${{ github.event.inputs.image_tag }}"
+
+  deploy-gcp:
+    if: vars.DEPLOY_TARGET == 'gcp'
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    permissions:
+      id-token: write  # Required for Workload Identity Federation
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # HITL: GCP_WORKLOAD_IDENTITY_PROVIDER / GCP_SERVICE_ACCOUNT are produced
+      # by the one-time human WIF provisioning steps in SECURITY.md §
+      # "Provisioning WIF for GCP". Missing values here mean WIF has not yet
+      # been provisioned — do not attempt to auto-create them.
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
+          region: ${{ vars.GCP_REGION }}
+          image: ghcr.io/${{ github.repository }}:${{ github.event.inputs.image_tag }}

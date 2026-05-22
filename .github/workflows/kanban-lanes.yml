@@ -1,0 +1,65 @@
+name: Kanban Lane Sync
+
+# Moves a project board item to the matching lane when an agent: label is applied.
+# Requires GH_TOKEN secret — classic PAT with 'project' scope.
+# Fine-grained PATs do not support Projects v2; a classic token is required.
+#
+# Repository variables required (set automatically by: task setup):
+#   KANBAN_PROJECT_ID, KANBAN_STATUS_FIELD_ID,
+#   KANBAN_OPT_IMPLEMENTING, KANBAN_OPT_REVIEW, KANBAN_OPT_MERGED
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  sync-lane:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Move issue to matching kanban lane
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          LABEL="${{ github.event.label.name }}"
+          ISSUE="${{ github.event.issue.number }}"
+
+          case "$LABEL" in
+            "agent:implementing") OPTION="${{ vars.KANBAN_OPT_IMPLEMENTING }}" ;;
+            "agent:review")       OPTION="${{ vars.KANBAN_OPT_REVIEW }}" ;;
+            "agent:merged")       OPTION="${{ vars.KANBAN_OPT_MERGED }}" ;;
+            *)
+              echo "Label '$LABEL' has no lane mapping — skipping."
+              exit 0
+              ;;
+          esac
+
+          if [ -z "$OPTION" ]; then
+            echo "Lane option ID not configured for '$LABEL' — run: task setup"
+            exit 0
+          fi
+
+          # --limit 200: the gh CLI default is 30, which silently drops items
+          # past the first page on growing boards (caused issue #23 to be
+          # reported as "not in project" once the board reached 30+ items).
+          ITEM_ID=$(gh project item-list "${{ vars.KANBAN_PROJECT_NUMBER }}" \
+            --owner "${{ vars.KANBAN_PROJECT_OWNER }}" --format json --limit 200 \
+            --jq ".items[] | select(.content.number == $ISSUE) | .id")
+
+          if [ -z "$ITEM_ID" ]; then
+            echo "Issue #$ISSUE not found in project — skipping."
+            exit 0
+          fi
+
+          PROJECT_ID="${{ vars.KANBAN_PROJECT_ID }}"
+          if [ -z "$PROJECT_ID" ]; then
+            echo "KANBAN_PROJECT_ID not configured — run: task setup"
+            exit 1
+          fi
+
+          gh project item-edit \
+            --id    "$ITEM_ID" \
+            --field-id "${{ vars.KANBAN_STATUS_FIELD_ID }}" \
+            --project-id "$PROJECT_ID" \
+            --single-select-option-id "$OPTION"
+
+          echo "✓ Issue #$ISSUE moved to lane for label '$LABEL'."
