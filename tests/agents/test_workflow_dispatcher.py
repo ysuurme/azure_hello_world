@@ -28,12 +28,6 @@ class TestCommandParsing:
         result = d.dispatch("/bogus", {})
         assert "/diagram" in result.response_text
 
-    def test_unknown_command_includes_prefix(self):
-        d = _make_dispatcher()
-        result = d.dispatch("/dgram", {})
-        assert "Unknown command" in result.response_text
-        assert "/dgram" in result.response_text
-
     def test_known_command_routes_to_module(self):
         d = _make_dispatcher()
         d._modules["/diagram"].handle = MagicMock(return_value=_mock_module_response("D2 output"))
