@@ -76,12 +76,20 @@ function Resolve-ProjectMetadata([string]$ProjectName, [string]$Owner) {
 # After issue creation, the project item ID is needed to set custom fields.
 # `gh issue create --project <name>` adds the issue to the project but does
 # not return the item id, so we look it up by issue number.
-function Get-ProjectItemId([int]$IssueNumber, [int]$ProjectNumber, [string]$Owner) {
-    $itemsJson = gh project item-list $ProjectNumber --owner $Owner --limit 200 --format json 2>&1
-    if ($LASTEXITCODE -ne 0) { return $null }
-    $items = ($itemsJson | ConvertFrom-Json).items
-    $item = $items | Where-Object { $_.content -and $_.content.number -eq $IssueNumber } | Select-Object -First 1
-    if ($item) { return $item.id }
+#
+# GitHub adds the newly-created issue to the project board asynchronously, so a
+# lookup fired immediately after creation usually misses it. Poll with backoff
+# until the item appears (or attempts run out) before giving up.
+function Get-ProjectItemId([int]$IssueNumber, [int]$ProjectNumber, [string]$Owner, [int]$MaxAttempts = 6, [int]$DelaySeconds = 2) {
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        $itemsJson = gh project item-list $ProjectNumber --owner $Owner --limit 200 --format json 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            $items = ($itemsJson | ConvertFrom-Json).items
+            $item = $items | Where-Object { $_.content -and $_.content.number -eq $IssueNumber } | Select-Object -First 1
+            if ($item) { return $item.id }
+        }
+        if ($attempt -lt $MaxAttempts) { Start-Sleep -Seconds $DelaySeconds }
+    }
     return $null
 }
 
