@@ -1,118 +1,95 @@
-resource "azurerm_resource_group" "rg" {
+data "azuread_client_config" "current" {}
+
+resource "azurerm_resource_group" "helloarch" {
   name     = var.resource_group_name
   location = var.location
 }
 
-# --- Azure AI Hub (AI Foundry Hub workspace) ---
-resource "azapi_resource" "ai_hub" {
-  type      = "Microsoft.MachineLearningServices/workspaces@2024-10-01"
-  name      = "hub-${var.project_prefix}-${var.environment}"
-  location  = azurerm_resource_group.rg.location
-  parent_id = azurerm_resource_group.rg.id
+# --- Azure AI Foundry (AIServices account with project management) ---
+resource "azapi_resource" "foundry" {
+  type      = "Microsoft.CognitiveServices/accounts@2025-04-01-preview"
+  name      = var.foundry_account_name
+  location  = azurerm_resource_group.helloarch.location
+  parent_id = azurerm_resource_group.helloarch.id
 
   identity {
     type = "SystemAssigned"
   }
 
   body = jsonencode({
-    kind = "Hub"
+    kind = "AIServices"
+    sku  = { name = "S0" }
     properties = {
-      friendlyName        = "AI Hub ${var.project_prefix}"
-      publicNetworkAccess = "Enabled"
-    }
-    sku = {
-      name = "Basic"
+      allowProjectManagement = true
+      customSubDomainName     = var.foundry_account_name
+      publicNetworkAccess     = "Enabled"
     }
   })
+
+  response_export_values = ["properties.endpoint"]
 }
 
-# --- Azure AI Foundry Project ---
-resource "azapi_resource" "ai_project" {
-  type      = "Microsoft.MachineLearningServices/workspaces@2024-10-01"
-  name      = "proj-${var.project_prefix}-${var.environment}"
-  location  = azurerm_resource_group.rg.location
-  parent_id = azurerm_resource_group.rg.id
+# --- Azure AI Foundry project ---
+resource "azapi_resource" "project" {
+  type      = "Microsoft.CognitiveServices/accounts/projects@2025-04-01-preview"
+  name      = var.foundry_project_name
+  location  = azurerm_resource_group.helloarch.location
+  parent_id = azapi_resource.foundry.id
 
   identity {
     type = "SystemAssigned"
   }
 
-  response_export_values = ["identity.principalId"]
-
   body = jsonencode({
-    kind = "Project"
     properties = {
-      friendlyName  = "Sentinel Project"
-      hubResourceId = azapi_resource.ai_hub.id
-    }
-    sku = {
-      name = "Basic"
+      displayName = var.foundry_project_display_name
     }
   })
 }
 
-# --- Azure AI Search (Basic SKU) ---
-resource "azurerm_search_service" "search" {
-  name                = "srch-${var.project_prefix}-${var.environment}"
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = azurerm_resource_group.rg.location
-  sku                 = "basic"
+# --- Model deployments (Mistral stack; non-OpenAI, OpenAI-client compatible) ---
+resource "azurerm_cognitive_deployment" "models" {
+  for_each             = var.model_deployments
+  name                 = each.key
+  cognitive_account_id = azapi_resource.foundry.id
 
-  local_authentication_enabled = false
+  model {
+    format  = each.value.format
+    name    = each.value.name
+    version = each.value.version
+  }
 
-  identity {
-    type = "SystemAssigned"
+  sku {
+    name     = "GlobalStandard"
+    capacity = 1
   }
 }
 
-# --- RBAC: Project MI → Search Service ---
-resource "azurerm_role_assignment" "project_search_contributor" {
-  scope                = azurerm_search_service.search.id
-  role_definition_name = "Search Index Data Contributor"
-  principal_id         = azapi_resource.ai_project.output.identity.principalId
+# --- Service Principal (identity for the containerised app) ---
+resource "azuread_application" "helloarch" {
+  display_name = var.sp_name
+  owners       = [data.azuread_client_config.current.object_id]
 }
 
-resource "azurerm_role_assignment" "project_search_reader" {
-  scope                = azurerm_search_service.search.id
-  role_definition_name = "Search Index Data Reader"
-  principal_id         = azapi_resource.ai_project.output.identity.principalId
+resource "azuread_service_principal" "helloarch" {
+  client_id = azuread_application.helloarch.client_id
+  owners    = [data.azuread_client_config.current.object_id]
 }
 
-# --- Search Connection (Project Managed Identity, no hardcoded keys) ---
-resource "azapi_resource" "search_connection" {
-  type      = "Microsoft.MachineLearningServices/workspaces/connections@2024-10-01"
-  name      = "search-connection"
-  parent_id = azapi_resource.ai_project.id
-
-  body = jsonencode({
-    properties = {
-      category      = "CognitiveSearch"
-      target        = "https://${azurerm_search_service.search.name}.search.windows.net"
-      authType      = "ProjectManagedIdentity"
-      isSharedToAll = true
-      metadata = {
-        ApiType    = "Azure"
-        ResourceId = azurerm_search_service.search.id
-      }
-    }
-  })
-
-  depends_on = [
-    azurerm_role_assignment.project_search_contributor,
-    azurerm_role_assignment.project_search_reader,
-  ]
+resource "azuread_service_principal_password" "helloarch" {
+  service_principal_id = azuread_service_principal.helloarch.object_id
+  end_date_relative    = "8760h"
 }
 
-# --- Capability Host (Agent Service tool execution) ---
-resource "azapi_resource" "capability_host" {
-  type      = "Microsoft.MachineLearningServices/workspaces/capabilityHosts@2025-01-01-preview"
-  name      = "default"
-  parent_id = azapi_resource.ai_project.id
+# --- RBAC: SP → Foundry account (project ops + inference) ---
+resource "azurerm_role_assignment" "sp_ai_developer" {
+  scope                = azapi_resource.foundry.id
+  role_definition_name = "Azure AI Developer"
+  principal_id         = azuread_service_principal.helloarch.object_id
+}
 
-  body = jsonencode({
-    properties = {
-      capabilityHostKind     = "Agents"
-      vectorStoreConnections = [azapi_resource.search_connection.name]
-    }
-  })
+resource "azurerm_role_assignment" "sp_cognitive_user" {
+  scope                = azapi_resource.foundry.id
+  role_definition_name = "Cognitive Services User"
+  principal_id         = azuread_service_principal.helloarch.object_id
 }
