@@ -78,3 +78,27 @@ Default new issues to **P3** (new work) or **P4** (improvement). Escalation to P
 
 <!-- ISSUES -->
 
+ISSUE: Deploy frontend Container App (external ingress + auth) to the internal backend
+LABELS: HITL
+ESTIMATE: 8
+PRIORITY: P3
+
+**Goal:** Complete the "use it from laptop/web/mobile" goal by exposing the Streamlit frontend as a public Container App that talks to the existing internal backend (`ca-helloarch-api`).
+
+**Description:** The backend Container App is deployed with internal-only ingress (no public `/dispatch`). To reach it from outside the Container Apps environment we need a frontend Container App with external ingress and authentication, calling the backend over the environment's internal network. Auth approach is a design decision (HITL) — e.g. Container Apps built-in auth (Easy Auth) via Entra ID.
+
+**Requirements:**
+- Add a frontend Container App to `infra/` (external ingress, target port for Streamlit, traffic weight 100% latest).
+- Reuse/extend managed identity; no client secret in the cloud (consistent with the backend's secretless posture).
+- Backend base URL wired to the internal FQDN (`backend_internal_fqdn` output) via env.
+- Front the app with authentication (Entra ID / Easy Auth) — decide and document the mechanism in an ADR.
+- Export the frontend public FQDN as a Terraform output.
+
+**Acceptance Criteria:**
+- `terraform validate` passes; `terraform plan` is clean with `ARM_SUBSCRIPTION_ID` set.
+- `infra/` content tests cover the frontend Container App (external ingress, identity, internal-backend wiring).
+- Authenticated request to the public frontend reaches the internal backend and returns a diagram end-to-end.
+- `uv run pytest` green.
+
+END_ISSUE
+

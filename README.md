@@ -194,7 +194,7 @@ terraform validate     # passes
 terraform plan
 ```
 
-**Status / next step:** Backend is deployed and validated end-to-end (`/healthz` → ok, `/diagram` → SVG via UAMI→Foundry). The natural next step is a **frontend Container App** (external ingress + auth) talking to the internal backend — completing the laptop/web/mobile goal.
+**Status:** Backend is deployed and validated end-to-end (`/healthz` → ok, `/diagram` → SVG via UAMI→Foundry).
 
 > **Caveat:** local `docker compose` may still run an image built before the Dockerfile `/app` permission fix (`chown` + switch user *after* COPYs). A `docker compose build` picks up the deterministic fix.
 
