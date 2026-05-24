@@ -32,12 +32,16 @@ COPY --from=builder /usr/local/bin/d2 /usr/local/bin/d2
 
 # Rootless operation
 RUN useradd -m appuser
-USER appuser
 
 WORKDIR /app
 
 COPY --from=builder /app/.venv /app/.venv
 COPY src/ ./src/
+
+# Ensure /app (incl. runtime logs/ and designs/) is writable by the non-root user.
+# Without this the container crashes on startup creating /app/logs as appuser.
+RUN mkdir -p /app/logs && chown -R appuser:appuser /app
+USER appuser
 
 # Backend (:8000) and Streamlit frontend (:8501) — command is caller-specified
 EXPOSE 8000 8501

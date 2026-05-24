@@ -2,20 +2,20 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.0"
+      version = "~> 4.0"
     }
     azapi = {
       source  = "azure/azapi"
       version = "~> 2.0"
     }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "~> 2.0"
+    }
   }
 
-  backend "azurerm" {
-    resource_group_name  = "rg-tfstate-hobby-ai"
-    storage_account_name = "stsentineltfstate"
-    container_name       = "tfstate"
-    key                  = "azure-hello-world.tfstate"
-  }
+  # Local state for now (no remote backend provisioned). Local state files
+  # are gitignored. A remote backend can be added later as its own step.
 }
 
 provider "azurerm" {
@@ -23,3 +23,5 @@ provider "azurerm" {
 }
 
 provider "azapi" {}
+
+provider "azuread" {}

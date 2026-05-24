@@ -1,18 +1,45 @@
 output "resource_group_id" {
-  value = azurerm_resource_group.rg.id
+  description = "Resource ID of the Hello Architect resource group"
+  value       = azurerm_resource_group.helloarch.id
 }
 
-output "search_service_endpoint" {
-  description = "HTTPS endpoint for the Azure AI Search service"
-  value       = "https://${azurerm_search_service.search.name}.search.windows.net"
+output "foundry_account_endpoint" {
+  description = "Base endpoint of the AIServices Foundry account"
+  value       = jsondecode(azapi_resource.foundry.output).properties.endpoint
 }
 
-output "ai_project_id" {
-  description = "Resource ID of the Azure AI Foundry project workspace"
-  value       = azapi_resource.ai_project.id
+output "foundry_project_endpoint" {
+  description = "Project inference endpoint — set as AZURE_AAIF_PROJECT_ENDPOINT"
+  value       = "https://${var.foundry_account_name}.services.ai.azure.com/api/projects/${var.foundry_project_name}"
 }
 
-output "ai_hub_id" {
-  description = "Resource ID of the Azure AI Hub workspace"
-  value       = azapi_resource.ai_hub.id
+output "sp_client_id" {
+  description = "Application (client) ID for sp-helloarch-dev — set as AZURE_CLIENT_ID"
+  value       = azuread_service_principal.helloarch.client_id
+}
+
+output "sp_tenant_id" {
+  description = "Tenant ID — set as AZURE_TENANT_ID"
+  value       = data.azuread_client_config.current.tenant_id
+}
+
+output "sp_client_secret" {
+  description = "Client secret for sp-helloarch-dev — set as AZURE_CLIENT_SECRET"
+  value       = azuread_service_principal_password.helloarch.value
+  sensitive   = true
+}
+
+output "acr_login_server" {
+  description = "ACR login server for image pushes/pulls"
+  value       = azurerm_container_registry.acr.login_server
+}
+
+output "api_identity_client_id" {
+  description = "Client ID of the backend managed identity — used as AZURE_CLIENT_ID in the container"
+  value       = azurerm_user_assigned_identity.api.client_id
+}
+
+output "backend_internal_fqdn" {
+  description = "Internal ingress FQDN of the backend Container App"
+  value       = azurerm_container_app.api.ingress[0].fqdn
 }

@@ -1,23 +1,73 @@
 variable "resource_group_name" {
   type        = string
-  description = "The name of the resource group"
-  default     = "rg-hobby-ai-dev"
+  description = "Resource group for all Hello Architect resources (CAF: rg-<workload>-<env>)"
+  default     = "rg-helloarch-dev"
 }
 
 variable "location" {
   type        = string
-  description = "The Azure region to deploy to"
-  default     = "eastus"
+  description = "Azure region to deploy resources"
+  default     = "swedencentral"
 }
 
-variable "environment" {
+variable "foundry_account_name" {
   type        = string
-  description = "Deployment environment identifier (e.g. dev, prod)"
-  default     = "dev"
+  description = "AIServices (Azure AI Foundry) account name; also used as the custom subdomain"
+  default     = "aaif-helloarch-dev"
 }
 
-variable "project_prefix" {
+variable "foundry_project_name" {
   type        = string
-  description = "Short prefix used in resource names to identify the project"
-  default     = "sentinel"
+  description = "Foundry project sub-resource name (appears in the inference endpoint path)"
+  default     = "helloarch"
+}
+
+variable "foundry_project_display_name" {
+  type        = string
+  description = "Friendly display name for the Foundry project"
+  default     = "Hello Architect"
+}
+
+variable "sp_name" {
+  type        = string
+  description = "Display name of the Service Principal (CAF: sp-<workload>-<env>)"
+  default     = "sp-helloarch-dev"
+}
+
+variable "acr_name" {
+  type        = string
+  description = "Azure Container Registry name (alphanumeric, globally unique)"
+  default     = "crhelloarchdev"
+}
+
+variable "api_identity_name" {
+  type        = string
+  description = "User-assigned managed identity for the backend Container App"
+  default     = "id-helloarch-api"
+}
+
+variable "container_app_environment_name" {
+  type        = string
+  description = "Container Apps managed environment name"
+  default     = "cae-helloarch-dev"
+}
+
+variable "backend_app_name" {
+  type        = string
+  description = "Backend Container App name"
+  default     = "ca-helloarch-api"
+}
+
+variable "model_deployments" {
+  type = map(object({
+    name    = string
+    version = string
+    format  = string
+  }))
+  description = "Model deployments on the Foundry account, keyed by deployment name."
+  default = {
+    "mistral-small-2503" = { name = "mistral-small-2503", version = "1", format = "Mistral AI" }
+    "Mistral-Large-3"    = { name = "Mistral-Large-3", version = "1", format = "Mistral AI" }
+    "Codestral-2501"     = { name = "Codestral-2501", version = "2", format = "Mistral AI" }
+  }
 }
