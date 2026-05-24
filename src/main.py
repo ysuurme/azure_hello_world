@@ -1,47 +1,64 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from importlib.metadata import PackageNotFoundError, metadata
+from __future__ import annotations
+
+import base64
+from contextlib import asynccontextmanager
 from typing import Any
 
-from src.config import settings
-from src.utils.m_log import f_log, setup_logging
+from fastapi import FastAPI, Request
+from pydantic import BaseModel
+
+import src.utils.m_ai_client as m_ai_client
+from src.agents.workflow_dispatcher import WorkflowDispatcher
+from src.utils.m_log import setup_logging
+
+setup_logging()
 
 
-def _identity() -> tuple[str, str]:
-    try:
-        meta = metadata("my-template-repo")
-        return meta["Name"], f"v{meta['Version']}"
-    except PackageNotFoundError:
-        return "my-template-repo", "v0.0.0"
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    cm = m_ai_client.ClientManager()
+    app.state.dispatcher = WorkflowDispatcher(client_manager=cm)
+    yield
 
 
-class HelloHandler(BaseHTTPRequestHandler):
-    def do_GET(self) -> None:
-        if self.path == "/":
-            name, version = _identity()
-            body = f"<html><body><h1>{name} {version}</h1></body></html>".encode()
-            self._respond(200, "text/html", body)
-        elif self.path == "/healthz":
-            self._respond(200, "text/plain", b"ok")
-        else:
-            self._respond(404, "text/plain", b"Not Found")
-
-    def _respond(self, status: int, content_type: str, body: bytes) -> None:
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def log_message(self, format: str, *args: Any) -> None:
-        f_log(f"{self.address_string()} - {format % args}")
+app = FastAPI(title="Azure Architecture Sentinel API", version="1.0.0", lifespan=lifespan)
 
 
-def main() -> None:
-    setup_logging()
-    server = HTTPServer(("0.0.0.0", settings.port), HelloHandler)
-    f_log(f"Serving on port {settings.port}", level="start")
-    server.serve_forever()
+class DispatchRequest(BaseModel):
+    query: str
+    session_state: dict[str, Any] = {}
 
 
-if __name__ == "__main__":
-    main()
+class ArtifactsModel(BaseModel):
+    svg: str | None = None
+    d2: str | None = None
+
+
+class DispatchResponse(BaseModel):
+    response_text: str
+    updated_state: dict[str, Any]
+    artifacts: ArtifactsModel
+    status: str
+
+
+@app.get("/healthz")
+async def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.post("/dispatch", response_model=DispatchResponse)
+async def dispatch_endpoint(body: DispatchRequest, request: Request) -> DispatchResponse:
+    dispatcher: WorkflowDispatcher = request.app.state.dispatcher
+    result = dispatcher.dispatch(body.query, body.session_state)
+
+    svg_b64: str | None = None
+    raw_svg = result.artifacts.get("svg")
+    if raw_svg is not None:
+        svg_b64 = base64.b64encode(raw_svg).decode("utf-8") if isinstance(raw_svg, bytes) else str(raw_svg)
+
+    return DispatchResponse(
+        response_text=result.response_text,
+        updated_state=result.updated_state,
+        artifacts=ArtifactsModel(svg=svg_b64, d2=result.artifacts.get("d2")),
+        status=result.status,
+    )
