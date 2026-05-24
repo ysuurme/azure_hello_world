@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Azure Architecture Sentinel API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Hello Architect API", version="1.0.0", lifespan=lifespan)
 
 
 class DispatchRequest(BaseModel):

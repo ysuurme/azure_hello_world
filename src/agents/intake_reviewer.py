@@ -23,7 +23,7 @@ class IntakeReviewerAgent:
         self._load_template()
 
         self.system_prompt = (
-            "You are the Intake Reviewer for an Architecture Sentinel. "
+            "You are the Intake Reviewer for Hello Architect. "
             f"Your job is to review the user's software description against this template: \n{self.template}\n"
             "If the user has not provided enough information, return a JSON object exactly like this: "
             '{"status": "needs_clarification", "questions": '
