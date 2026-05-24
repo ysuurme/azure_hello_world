@@ -39,10 +39,18 @@ def test_dockerfile_uv_binary_copy() -> None:
     )
 
 
-def test_dockerfile_cmd() -> None:
-    assert 'CMD ["python", "-m", "src.main"]' in DOCKERFILE.read_text(), (
-        'Dockerfile runtime stage must use CMD ["python", "-m", "src.main"]'
+def test_dockerfile_no_hard_entrypoint() -> None:
+    assert "ENTRYPOINT" not in DOCKERFILE.read_text(), (
+        "Dockerfile must not contain a hard ENTRYPOINT — command is caller-specified via docker-compose"
     )
+
+
+def test_dockerfile_exposes_backend_port() -> None:
+    assert "8000" in DOCKERFILE.read_text(), "Dockerfile must EXPOSE backend port 8000"
+
+
+def test_dockerfile_exposes_frontend_port() -> None:
+    assert "8501" in DOCKERFILE.read_text(), "Dockerfile must EXPOSE Streamlit frontend port 8501"
 
 
 def test_dockerfile_env_vars() -> None:
