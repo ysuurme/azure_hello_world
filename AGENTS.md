@@ -53,6 +53,7 @@ Invoke the relevant skill in `.agents/skills/` before implementing manually.
 | `src/tools/` | Developer utilities |
 | `tests/` | Pytest suite, mirrors `src/` and `tools/` hierarchy |
 | `.agents/skills/` | Skill system instructions |
+| `infra/` | Terraform IaC for the Azure cloud backend (ACR + UAMI + Container Apps + Foundry). azurerm `~> 4.0`, local state. |
 | `docs/adr/` | Architecture Decision Records |
 | `CONTEXT.md` | Repo-structure doc — domain glossary, Module Map, architectural constraints |
 | `.github/workflows/` | CI: lint + test |
@@ -84,7 +85,7 @@ The active driver is set via `AGENT_DRIVER` in `.env` (`gemini` or `claude`).
 - **STRICT PROJECT ROOT BOUNDARY:** Never modify files or run commands that affect files outside this project root directory.
 - **SYSTEM HARM:** When in doubt, do NOT run commands that could potentially harm the host system. Fall back to safely failing.
 - **NO DESTRUCTIVE GLOBAL COMMANDS:** Global state changes are strictly prohibited.
-- **Tooling Policy:** Allowed shell commands: `gh`, `task`, `git`, `ruff`, `uv run`.
+- **Tooling Policy:** Allowed shell commands: `gh`, `task`, `git`, `ruff`, `uv run`, `terraform` (scoped to `infra/`).
 
 ## Personal Learning Goals
 

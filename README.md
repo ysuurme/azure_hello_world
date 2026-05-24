@@ -167,6 +167,39 @@ docker compose -f docker-compose.dev.yml up --build
 
 ---
 
+## Cloud Deployment (Azure)
+
+The `infra/` Terraform stack provisions the full backend on Azure, **secretless in the cloud** — all auth flows through managed identity, never a client secret.
+
+```
+crhelloarchdev (ACR) ──AcrPull(UAMI)──► ca-helloarch-api (Container App, internal ingress :8000)
+id-helloarch-api (UAMI) ──Azure AI Developer + Cognitive Services User──► aaif-helloarch-dev (Foundry)
+```
+
+**What it provisions** (`rg-helloarch-dev`, `swedencentral`):
+- **Foundry** — AIServices account + `helloarch` project + Mistral model deployments (`mistral-small-2503`, `Mistral-Large-3`, `Codestral-2501`).
+- **ACR** `crhelloarchdev` (admin disabled — pull via UAMI only).
+- **Backend Container App** `ca-helloarch-api` — internal ingress, runs the FastAPI image, identity = user-assigned `id-helloarch-api`. No public `/dispatch`.
+- **Identities & RBAC** — UAMI (AcrPull + Azure AI Developer + Cognitive Services User) and a Service Principal (`sp-helloarch-dev`) for local/SP auth.
+
+**Provider:** azurerm `~> 4.0` (validated on v4.74.0), azapi `~> 2.0`, azuread `~> 2.0`. Local state (gitignored); no remote backend yet.
+
+```powershell
+# azurerm v4 requires a subscription at plan/apply (validate does not):
+$env:ARM_SUBSCRIPTION_ID = (az account show --query id -o tsv)
+
+cd infra
+terraform init
+terraform validate     # passes
+terraform plan
+```
+
+**Status / next step:** Backend is deployed and validated end-to-end (`/healthz` → ok, `/diagram` → SVG via UAMI→Foundry). The natural next step is a **frontend Container App** (external ingress + auth) talking to the internal backend — completing the laptop/web/mobile goal.
+
+> **Caveat:** local `docker compose` may still run an image built before the Dockerfile `/app` permission fix (`chown` + switch user *after* COPYs). A `docker compose build` picks up the deterministic fix.
+
+---
+
 ## Agent Skills Framework (`.agents/skills/`)
 AI Agents operating in this workspace act as the "Senior Educational Software Architect" and evaluate code geometry via three exclusive protocols:
 
