@@ -37,7 +37,7 @@ class TestUITopology:
 
         assert not app_test.exception
 
-        assert app_test.title[0].value == "Architecture Agent 🛡️"
+        assert app_test.title[0].value == "Hello Architect"
         assert app_test.markdown[0].value == "### Technical Design Authority Agent"
 
         assert "Backend:" in app_test.sidebar.info[0].value

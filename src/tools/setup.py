@@ -1,4 +1,4 @@
-"""Populate CONTEXT.md sentinel tokens from .copier-answers.yml."""
+"""Populate CONTEXT.md template tokens from .copier-answers.yml."""
 
 import subprocess
 import sys
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-_SENTINELS: dict[str, str] = {
+_TOKENS: dict[str, str] = {
     "__PROJECT_NAME__": "project_name",
     "__PROJECT_DESCRIPTION__": "description",
     "__PROJECT_TYPE__": "project_type",
@@ -36,10 +36,10 @@ def prompt_for_answers() -> dict:
     return answers
 
 
-def replace_sentinels(content: str, answers: dict) -> str:
-    for sentinel, key in _SENTINELS.items():
+def replace_tokens(content: str, answers: dict) -> str:
+    for token, key in _TOKENS.items():
         value = answers.get(key, "")
-        content = content.replace(sentinel, str(value))
+        content = content.replace(token, str(value))
     return content
 
 
@@ -61,7 +61,7 @@ def main() -> None:
         answers = prompt_for_answers()
 
     content = _CONTEXT_FILE.read_text(encoding="utf-8")
-    updated = replace_sentinels(content, answers)
+    updated = replace_tokens(content, answers)
     _CONTEXT_FILE.write_text(updated, encoding="utf-8")
 
     project_type = answers.get("project_type", "")

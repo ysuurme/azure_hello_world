@@ -7,7 +7,7 @@ from src.tools.setup import (
     load_answers,
     main,
     prompt_for_answers,
-    replace_sentinels,
+    replace_tokens,
     set_github_variable,
 )
 
@@ -47,7 +47,7 @@ def test_replace_sentinels_substitutes_all_three() -> None:
         "description": "A great app",
         "project_type": "application",
     }
-    result = replace_sentinels(content, answers)
+    result = replace_tokens(content, answers)
     assert "my-app" in result
     assert "A great app" in result
     assert "application" in result
@@ -63,8 +63,8 @@ def test_replace_sentinels_is_idempotent() -> None:
         "description": "A great app",
         "project_type": "application",
     }
-    first = replace_sentinels(content, answers)
-    second = replace_sentinels(first, answers)
+    first = replace_tokens(content, answers)
+    second = replace_tokens(first, answers)
     assert first == second
 
 
@@ -75,13 +75,13 @@ def test_replace_sentinels_no_op_when_already_replaced() -> None:
         "description": "A great app",
         "project_type": "application",
     }
-    result = replace_sentinels(content, answers)
+    result = replace_tokens(content, answers)
     assert result == content
 
 
 def test_replace_sentinels_uses_empty_string_for_missing_key() -> None:
     content = "# __PROJECT_NAME__"
-    result = replace_sentinels(content, {})
+    result = replace_tokens(content, {})
     assert result == "# "
 
 

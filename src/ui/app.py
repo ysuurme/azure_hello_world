@@ -56,8 +56,8 @@ def _handle_dispatch(query: str) -> None:
             st.image(base64.b64decode(svg_b64))
 
 
-st.set_page_config(page_title="Azure Architecture Agent", layout="wide")
-st.title("Architecture Agent 🛡️")
+st.set_page_config(page_title="Hello Architect", layout="wide")
+st.title("Hello Architect")
 st.markdown("### Technical Design Authority Agent")
 
 if "maf_state" not in st.session_state:
