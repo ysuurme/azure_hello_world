@@ -193,3 +193,57 @@ def test_sp_client_secret_output_sensitive() -> None:
     content = OUTPUTS_TF.read_text()
     assert "sp_client_secret" in content, "outputs.tf must export sp_client_secret"
     assert "sensitive   = true" in content, "sp_client_secret output must be marked sensitive"
+
+
+# --- Container Registry + Container Apps -----------------------------------
+
+
+def test_container_registry_defined() -> None:
+    content = MAIN_TF.read_text()
+    assert "azurerm_container_registry" in content, "ACR must be defined"
+
+
+def test_acr_admin_disabled() -> None:
+    content = MAIN_TF.read_text()
+    assert "admin_enabled       = false" in content, "ACR admin user must be disabled (use managed identity)"
+
+
+def test_user_assigned_identity_defined() -> None:
+    content = MAIN_TF.read_text()
+    assert "azurerm_user_assigned_identity" in content, "Backend user-assigned managed identity must be defined"
+
+
+def test_uami_acrpull_grant() -> None:
+    content = MAIN_TF.read_text()
+    assert '"AcrPull"' in content, "Backend identity must be granted AcrPull on the registry"
+
+
+def test_container_app_environment_defined() -> None:
+    content = MAIN_TF.read_text()
+    assert "azurerm_container_app_environment" in content, "Container Apps environment must be defined"
+
+
+def test_backend_container_app_defined() -> None:
+    content = MAIN_TF.read_text()
+    assert "azurerm_container_app" in content, "Backend Container App must be defined"
+
+
+def test_backend_ingress_internal() -> None:
+    content = MAIN_TF.read_text()
+    assert "external_enabled = false" in content, "Backend ingress must be internal (not publicly exposed)"
+
+
+def test_backend_uses_user_assigned_identity() -> None:
+    content = MAIN_TF.read_text()
+    assert "type         = \"UserAssigned\"" in content, "Container App must use the user-assigned identity"
+
+
+def test_backend_no_secret_env() -> None:
+    """The cloud backend must rely on managed identity, never a client secret."""
+    content = MAIN_TF.read_text()
+    assert "AZURE_CLIENT_SECRET" not in content, "Container App must not inject a client secret (use managed identity)"
+
+
+def test_backend_internal_fqdn_output() -> None:
+    content = OUTPUTS_TF.read_text()
+    assert "backend_internal_fqdn" in content, "outputs.tf must export backend_internal_fqdn"

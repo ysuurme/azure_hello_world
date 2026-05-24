@@ -34,6 +34,30 @@ variable "sp_name" {
   default     = "sp-helloarch-dev"
 }
 
+variable "acr_name" {
+  type        = string
+  description = "Azure Container Registry name (alphanumeric, globally unique)"
+  default     = "crhelloarchdev"
+}
+
+variable "api_identity_name" {
+  type        = string
+  description = "User-assigned managed identity for the backend Container App"
+  default     = "id-helloarch-api"
+}
+
+variable "container_app_environment_name" {
+  type        = string
+  description = "Container Apps managed environment name"
+  default     = "cae-helloarch-dev"
+}
+
+variable "backend_app_name" {
+  type        = string
+  description = "Backend Container App name"
+  default     = "ca-helloarch-api"
+}
+
 variable "model_deployments" {
   type = map(object({
     name    = string

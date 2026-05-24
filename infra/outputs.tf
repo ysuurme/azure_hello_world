@@ -28,3 +28,18 @@ output "sp_client_secret" {
   value       = azuread_service_principal_password.helloarch.value
   sensitive   = true
 }
+
+output "acr_login_server" {
+  description = "ACR login server for image pushes/pulls"
+  value       = azurerm_container_registry.acr.login_server
+}
+
+output "api_identity_client_id" {
+  description = "Client ID of the backend managed identity — used as AZURE_CLIENT_ID in the container"
+  value       = azurerm_user_assigned_identity.api.client_id
+}
+
+output "backend_internal_fqdn" {
+  description = "Internal ingress FQDN of the backend Container App"
+  value       = azurerm_container_app.api.ingress[0].fqdn
+}
