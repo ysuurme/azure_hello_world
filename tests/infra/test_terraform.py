@@ -52,24 +52,15 @@ def test_azuread_provider_declared() -> None:
     assert 'source  = "hashicorp/azuread"' in content, "azuread provider must be declared in providers.tf"
 
 
-def test_remote_backend_azurerm() -> None:
+def test_local_state_no_remote_backend() -> None:
     content = PROVIDERS_TF.read_text()
-    assert 'backend "azurerm"' in content, "Remote azurerm backend must be configured in providers.tf"
+    assert 'backend "azurerm"' not in content, "Stack uses local state; no remote azurerm backend should be configured"
 
 
-def test_backend_has_storage_account() -> None:
+def test_no_stale_backend_storage_references() -> None:
     content = PROVIDERS_TF.read_text()
-    assert "storage_account_name" in content, "Backend must specify storage_account_name"
-
-
-def test_backend_has_container() -> None:
-    content = PROVIDERS_TF.read_text()
-    assert "container_name" in content, "Backend must specify container_name"
-
-
-def test_consolidated_state_key() -> None:
-    content = PROVIDERS_TF.read_text()
-    assert "helloarch.tfstate" in content, "Stack must use the consolidated helloarch.tfstate state key"
+    for stale in ("rg-tfstate-hobby-ai", "stsentineltfstate"):
+        assert stale not in content, f"Stale backend reference '{stale}' must be removed"
 
 
 # --- Foundry account & project -------------------------------------------

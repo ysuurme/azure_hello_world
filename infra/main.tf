@@ -21,8 +21,8 @@ resource "azapi_resource" "foundry" {
     sku  = { name = "S0" }
     properties = {
       allowProjectManagement = true
-      customSubDomainName     = var.foundry_account_name
-      publicNetworkAccess     = "Enabled"
+      customSubDomainName    = var.foundry_account_name
+      publicNetworkAccess    = "Enabled"
     }
   })
 

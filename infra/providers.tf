@@ -14,13 +14,8 @@ terraform {
     }
   }
 
-  # Single state key for the consolidated Hello Architect stack.
-  backend "azurerm" {
-    resource_group_name  = "rg-tfstate-hobby-ai"
-    storage_account_name = "stsentineltfstate"
-    container_name       = "tfstate"
-    key                  = "helloarch.tfstate"
-  }
+  # Local state for now (no remote backend provisioned). Local state files
+  # are gitignored. A remote backend can be added later as its own step.
 }
 
 provider "azurerm" {
