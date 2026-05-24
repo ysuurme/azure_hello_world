@@ -37,10 +37,10 @@ def test_load_answers_returns_all_keys_including_private(tmp_path: Path) -> None
     assert "_commit" in result
 
 
-# --- replace_sentinels ---
+# --- replace_tokens ---
 
 
-def test_replace_sentinels_substitutes_all_three() -> None:
+def test_replace_tokens_substitutes_all_three() -> None:
     content = "# __PROJECT_NAME__\n__PROJECT_DESCRIPTION__\nType: __PROJECT_TYPE__"
     answers = {
         "project_name": "my-app",
@@ -56,7 +56,7 @@ def test_replace_sentinels_substitutes_all_three() -> None:
     assert "__PROJECT_TYPE__" not in result
 
 
-def test_replace_sentinels_is_idempotent() -> None:
+def test_replace_tokens_is_idempotent() -> None:
     content = "# __PROJECT_NAME__\n__PROJECT_DESCRIPTION__\nType: __PROJECT_TYPE__"
     answers = {
         "project_name": "my-app",
@@ -68,7 +68,7 @@ def test_replace_sentinels_is_idempotent() -> None:
     assert first == second
 
 
-def test_replace_sentinels_no_op_when_already_replaced() -> None:
+def test_replace_tokens_no_op_when_already_replaced() -> None:
     content = "# my-app\nA great app\nType: application"
     answers = {
         "project_name": "my-app",
@@ -79,7 +79,7 @@ def test_replace_sentinels_no_op_when_already_replaced() -> None:
     assert result == content
 
 
-def test_replace_sentinels_uses_empty_string_for_missing_key() -> None:
+def test_replace_tokens_uses_empty_string_for_missing_key() -> None:
     content = "# __PROJECT_NAME__"
     result = replace_tokens(content, {})
     assert result == "# "
@@ -156,7 +156,7 @@ def test_main_uses_fallback_when_answers_file_missing(tmp_path: Path, monkeypatc
     mock_gh.assert_called_once_with("application")
 
 
-def test_main_replaces_sentinels_and_sets_github_var(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_replaces_tokens_and_sets_github_var(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
 
     answers_file = tmp_path / ".copier-answers.yml"
