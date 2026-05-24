@@ -42,6 +42,7 @@ at the same time — never merge an ADR without a corresponding index update.
 | [ADR-009](ADR-009-context-strategy.md) | Context Strategy | Accepted | all | Module Map + Issue-Type Index in CONTEXT.md, Context Protocol in AGENTS.md, blocking ship gate on Module Map updates |
 | [ADR-010](ADR-010-workflow-dispatcher.md) | Workflow Dispatcher Architecture | Accepted | `project_type: application`, `project_type: agent` | Slash-command dispatcher routes the main chat to capability modules; existing AgenticOrchestrator extracted as `DesignArchitectureModule` |
 | [ADR-011](ADR-011-diagram-studio-sketch.md) | Diagram Studio Module with Native D2 Sketch Rendering | Accepted | `project_type: application`, `project_type: agent` | First capability module — refine-pattern grill loop produces a DiagramBrief; sketch enforced via `--sketch` at engine level; persist brief + D2 + SVG trio |
+| [ADR-012](ADR-012-fastapi-backend.md) | Adopt FastAPI for the Application Backend | Accepted | `project_type: application` | FastAPI + Uvicorn — request validation, auto OpenAPI schema, async-native; supersedes stdlib-only rejection scoped to hello-world starter |
 
 ---
 
@@ -51,7 +52,7 @@ Use this to determine which ADRs to load at session start. ADR-000 is always a t
 reference — load it only when creating a new ADR.
 
 ### `project_type: application` (default)
-Load: **ADR-003**, **ADR-004**, **ADR-007**, **ADR-008**, **ADR-009**, **ADR-010**, **ADR-011**
+Load: **ADR-003**, **ADR-004**, **ADR-007**, **ADR-008**, **ADR-009**, **ADR-010**, **ADR-011**, **ADR-012**
 
 ### `project_type: agent`
 Load: **ADR-003**, **ADR-004**, **ADR-006**, **ADR-007**, **ADR-008**, **ADR-009**, **ADR-010**, **ADR-011**
