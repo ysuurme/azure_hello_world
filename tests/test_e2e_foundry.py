@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import base64
 import os
+import re
 from collections.abc import Generator
 from pathlib import Path
 
@@ -79,12 +80,15 @@ class TestDesignPathE2E:
     """End-to-end smoke tests for the /design capability module."""
 
     def test_design_returns_non_empty_response(self, api_client: TestClient) -> None:
-        result = _dispatch(
+        result = _drive_to_done(
             api_client,
             "/design A 3-tier web app on Azure: App Service frontend, Azure Functions API, Cosmos DB backend",
-            {},
         )
-        assert result["status"] in ("completed", "in_refinement")
+        if result["status"] != "completed":
+            pytest.skip(
+                f"Design did not reach completed state (status={result['status']!r})"
+                " — check Foundry credentials and availability"
+            )
         assert len(result["response_text"]) > 20
 
     def test_design_persists_to_archive(self, api_client: TestClient) -> None:
@@ -106,12 +110,16 @@ class TestDesignPathE2E:
             pytest.skip("Design did not complete — skipping persistence check")
 
         after = set(archive.rglob("*"))
-        assert after - before, "Expected new files under designs/approved/ after /design run"
+        new_paths = after - before
+        assert new_paths, "Expected new files under designs/approved/ after /design run"
+        assert any(re.search(r"\d{8,}", p.name) for p in new_paths), (
+            "Expected at least one path with a numeric timestamp in its name"
+        )
 
     def test_design_svg_artifact_is_valid_when_present(self, api_client: TestClient) -> None:
         result = _drive_to_done(api_client, "/design Simple Azure app: App Service, SQL Database, Blob Storage")
         if result["status"] != "completed" or not result["artifacts"]["svg"]:
-            return
+            pytest.skip("SVG not produced in this run")
         svg_bytes = base64.b64decode(result["artifacts"]["svg"])
         assert b"<svg" in svg_bytes[:500]
 
@@ -132,6 +140,6 @@ class TestDiagramPathE2E:
             "/diagram Simple web app: Client -> API Gateway -> Backend Service -> Database. Left to right.",
         )
         if result["status"] != "completed" or not result["artifacts"]["svg"]:
-            return
+            pytest.skip("SVG not produced in this run")
         svg_bytes = base64.b64decode(result["artifacts"]["svg"])
         assert b"svg" in svg_bytes.lower()[:500]
