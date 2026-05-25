@@ -78,28 +78,3 @@ Default new issues to **P3** (new work) or **P4** (improvement). Escalation to P
 
 <!-- ISSUES -->
 
-ISSUE: Establish a versioned diagram aesthetic standard for consistent D2 styling
-LABELS: HITL
-ESTIMATE: 8
-PRIORITY: P3
-
-**Goal**
-Give every generated diagram a consistent visual feel by conforming to a named, versioned DiagramStyle standard, and let that standard evolve as best practices improve.
-
-**Description**
-Today the D2 generator freestyles visuals and `sketch=True` is hard-coded in `DiagramEngine`. Introduce a `DiagramStyle` standard with three layers: (1) engine config — D2 theme id, sketch on/off, layout engine, padding; (2) a reusable D2 `vars` + `classes` preamble defining named styles (service, datastore, queue, external, boundary) prepended to every generated diagram; (3) conventions — shape/colour semantics and naming/grouping rules injected into the D2-generation prompt so output is uniform. Aesthetic standards are reusable across projects, so by the platform/project scope boundary (validated patterns = platform scope) the standard is platform-scoped: ship a sensible default in-repo now, with a clean seam to load/override the active standard from platform storage (`stplatformydev`) later, versioned via blob versioning so the house style accrues best practices and keeps history. New diagrams always render against the current standard.
-
-**Requirements**
-- Define a `DiagramStyle` spec (engine config + D2 class/var preamble + conventions text); ship a sensible in-repo default.
-- `DiagramEngine.generate_svg` applies theme/sketch/layout from the standard and prepends the D2 preamble before rendering (sketch is no longer hard-coded).
-- The D2-generation prompt is augmented with the standard's conventions and instructed to apply the named classes rather than freestyle styling.
-- Provide the interface seam to later load/override the active standard from platform storage (versioned); the storage-backed layer itself is out of scope for this issue.
-- Add an ADR recording the DiagramStyle structure and the platform-scope placement decision (the explicit scope call).
-
-**Acceptance Criteria**
-- Two diagrams generated from different descriptions share consistent styling (classes, theme, shape semantics).
-- Changing the standard changes the look of subsequently generated diagrams from a single source of truth.
-- `sketch` is sourced from the standard, not hard-coded in `DiagramEngine`.
-- `uv run pytest` passes; new tests cover D2 preamble injection and engine config application.
-END_ISSUE
-
