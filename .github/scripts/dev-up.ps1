@@ -18,6 +18,9 @@
 param(
     [string]$VaultName  = 'kv-platformy-dev',
     [string]$SecretName = 'helloarch-sp-client-secret',
+    # Run containers detached. (A bare -d is swallowed by PowerShell's -Debug
+    # common-parameter prefix, so use -Detach.)
+    [switch]$Detach,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$ComposeArgs
 )
@@ -46,7 +49,10 @@ Write-Host "SP secret injected into environment (len $($secret.Length))." -Foreg
 
 try {
     # 4. Start compose; --build keeps the image deterministic, extra args pass through.
-    docker compose up --build @ComposeArgs
+    $cmd = @('compose', 'up', '--build')
+    if ($Detach) { $cmd += '-d' }
+    if ($ComposeArgs) { $cmd += ($ComposeArgs | Where-Object { $_ }) }
+    docker @cmd
 }
 finally {
     # 5. Scrub the secret from the environment when the script exits.

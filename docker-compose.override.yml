@@ -1,0 +1,16 @@
+# Local hot-reload overlay — auto-merged with docker-compose.yml by `docker compose up`
+# (i.e. via `task dev`). Live-mounts ./src and enables reload so code edits take
+# effect WITHOUT an image rebuild.
+#
+# For production-parity testing (image as it ships to ACR, no mounts/reload), bypass
+# this overlay explicitly:  docker compose -f docker-compose.yml up --build
+services:
+  backend:
+    command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/src"]
+    volumes:
+      - ./src:/app/src
+
+  frontend:
+    command: ["streamlit", "run", "src/ui/app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.runOnSave=true"]
+    volumes:
+      - ./src:/app/src
