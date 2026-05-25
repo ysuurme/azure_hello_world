@@ -235,7 +235,7 @@ def test_backend_ingress_internal() -> None:
 
 def test_backend_uses_user_assigned_identity() -> None:
     content = MAIN_TF.read_text()
-    assert "type         = \"UserAssigned\"" in content, "Container App must use the user-assigned identity"
+    assert 'type         = "UserAssigned"' in content, "Container App must use the user-assigned identity"
 
 
 def test_backend_no_secret_env() -> None:
