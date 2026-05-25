@@ -5,7 +5,7 @@ output "resource_group_id" {
 
 output "foundry_account_endpoint" {
   description = "Base endpoint of the AIServices Foundry account"
-  value       = jsondecode(azapi_resource.foundry.output).properties.endpoint
+  value       = azapi_resource.foundry.output.properties.endpoint
 }
 
 output "foundry_project_endpoint" {
@@ -21,12 +21,6 @@ output "sp_client_id" {
 output "sp_tenant_id" {
   description = "Tenant ID — set as AZURE_TENANT_ID"
   value       = data.azuread_client_config.current.tenant_id
-}
-
-output "sp_client_secret" {
-  description = "Client secret for sp-helloarch-dev — set as AZURE_CLIENT_SECRET"
-  value       = azuread_service_principal_password.helloarch.value
-  sensitive   = true
 }
 
 output "acr_login_server" {

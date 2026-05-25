@@ -184,27 +184,14 @@ id-helloarch-api (UAMI) ──Azure AI Developer + Cognitive Services User──
 
 **Provider:** azurerm `~> 4.0` (validated on v4.74.0), azapi `~> 2.0`, azuread `~> 2.0`. Remote state in Azure Storage (ADR-015).
 
-**State backend (one-time bootstrap):** state lives in a shared, project-agnostic platform resource group (`rg-platformy-dev`) so `az group delete rg-helloarch-dev` never destroys its own state. The backing account is hardened — RBAC-only (no account keys), no public blob access, blob versioning for recovery. Run once:
-```powershell
-az group create -n rg-platformy-dev -l swedencentral
-az storage account create -n stplatformydev -g rg-platformy-dev -l swedencentral `
-  --sku Standard_LRS --min-tls-version TLS1_2 `
-  --allow-blob-public-access false --allow-shared-key-access false
-az storage account blob-service-properties update `
-  --account-name stplatformydev --enable-versioning true
-az storage container create -n tfstate --account-name stplatformydev --auth-mode login
-# grant yourself data-plane access (RBAC-only account):
-az role assignment create --role "Storage Blob Data Contributor" `
-  --assignee (az ad signed-in-user show --query id -o tsv) `
-  --scope (az storage account show -n stplatformydev -g rg-platformy-dev --query id -o tsv)
-```
+**State backend:** Terraform state is stored remotely in a shared platform storage account (`stplatformydev`, container `tfstate`, key `helloarch/terraform.tfstate`), provisioned once as standalone platform infrastructure in `rg-platformy-dev` — deliberately separate from this project's resource group so it survives `az group delete rg-helloarch-dev`. See ADR-015.
 
 ```powershell
 # azurerm v4 requires a subscription at plan/apply (validate does not):
 $env:ARM_SUBSCRIPTION_ID = (az account show --query id -o tsv)
 
 cd infra
-terraform init -migrate-state   # first run after bootstrap; moves local state to the blob
+terraform init
 terraform validate
 terraform plan
 ```

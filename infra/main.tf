@@ -76,10 +76,9 @@ resource "azuread_service_principal" "helloarch" {
   owners    = [data.azuread_client_config.current.object_id]
 }
 
-resource "azuread_service_principal_password" "helloarch" {
-  service_principal_id = azuread_service_principal.helloarch.object_id
-  end_date_relative    = "8760h"
-}
+# No client secret is provisioned: the app uses DefaultAzureCredential (az login
+# locally, UAMI in the cloud). A credential is attached later as an OIDC federated
+# identity for CI (ADR-015 fast-follow), never a long-lived secret in state.
 
 # --- RBAC: SP → Foundry account (project ops + inference) ---
 resource "azurerm_role_assignment" "sp_ai_developer" {
@@ -163,7 +162,7 @@ resource "azurerm_container_app" "api" {
   }
 
   template {
-    min_replicas = 1
+    min_replicas = 0
     max_replicas = 1
 
     container {
