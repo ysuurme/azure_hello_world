@@ -56,6 +56,7 @@ my_template_repo/
 3. **D2 Diagram Visual Engine**: Python `subprocess` bindings execute a statically compiled [D2](https://d2lang.com/) binary; the LLM drafts SVG diagrams rendered live into Streamlit chat state.
 4. **Capability RAG via `my_second_brain`**: At runtime, agents read the Capability Framework (L1/L2/L3 technology cards) from `my_second_brain` via filesystem adapters. The `/capabilities/` directory in this repo is a **transitional cache** — the canonical store is being migrated there.
 5. **Approved Design Persistence**: `ArchitecturePersister` (`src/utils/m_persist_design.py`) writes timestamped SVG + MD deliverables into `my_second_brain`'s Architecture Design archive on approval.
+6. **Diagram Persistence & Aesthetic Standard**: Diagram Studio renders against a single `DiagramStyle` standard (`src/utils/m_diagram_style.py`) and persists the trio (brief + d2 + svg) via `src/utils/m_diagram_store.py` — filesystem locally, project-scoped Azure Blob (`sthelloarchdev/diagrams`) in the cloud — enabling `/diagram list|open|delete` and multi-session build-forward.
 
 ---
 
@@ -100,8 +101,8 @@ To run this application locally, you must satisfy the following environment and 
 5.  **Environment Variables**: Create a `.env` file in the project root with:
     - `AZURE_AAIF_PROJECT_ENDPOINT`: The endpoint for your AI Foundry project (e.g., `https://<REGION>.api.azureml.ms`).
     - (Optional) `SECOND_BRAIN_PATH`: Absolute path to your local `my_second_brain` repository (e.g., `/home/user/my_second_brain`). When set, `CapabilityRepository` reads from `$SECOND_BRAIN_PATH/capabilities/` and approved designs are written to `$SECOND_BRAIN_PATH/architecture/designs/approved/`. If unset, the engine falls back to local project directories (safe for CI).
-    - (Optional) `AZURE_AUTH_MODE`: Set to `cli` (default) for `az login`. The `sp` value is a **manual-only local path** — it forces Service Principal credential lookup via `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_CLIENT_SECRET`; it is never used by CI (which authenticates via OIDC federation) or the cloud runtime (which uses the UAMI).
-    - (Optional) `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_SECRET`: Only required when `AZURE_AUTH_MODE=sp` for manual local SP testing. Leave empty for normal `az login` usage.
+    - (Optional) `AZURE_AUTH_MODE`: `cli` (default) uses `az login` — fine for running the app natively on the host. The `sp` value forces Service Principal credential lookup (`EnvironmentCredential`) and is the path used when running the app **in a local container**, which must authenticate as a workload identity rather than depend on the host's `az login`. Neither path is used by CI (OIDC federation) or the cloud runtime (UAMI). See the 3-tier identity model in ADR-015.
+    - (Optional) `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`: the scoped Service Principal (`sp-helloarch-dev`); set for `AZURE_AUTH_MODE=sp`. `AZURE_CLIENT_SECRET` is **injected at launch** by `task dev` (fetched from the central platform Key Vault `kv-platformy-dev`), not stored in `.env`. Leave all three empty for plain `az login` usage.
 6.  **Model Deployments**: Ensure the following models are deployed in your AI Foundry project with names matching `config.py`:
     - `gpt-5-mini` (Intake Reviewer)
     - `DeepSeek-V3.1` (Architecture Composer)
@@ -118,6 +119,8 @@ Because we migrated into a Lean MVP architecture, startup is completely streamli
 task dev
 ```
 *(Access the UI immediately via `http://localhost:8501`)*
+
+`task dev` runs `.github/scripts/dev-up.ps1`, which fetches the `helloarch-sp-client-secret` from the central platform Key Vault (`kv-platformy-dev`) via `az`, injects it as `$env:AZURE_CLIENT_SECRET` for the compose run only (scrubbed in `finally`), and brings up the stack with hot-reload (`docker-compose.override.yml` mounts `./src`, uvicorn `--reload`, streamlit `--server.runOnSave`). The container authenticates to Azure as the Service Principal — no `az login` inside the container. Pass `-Detach` to run detached.
 
 ### 2. Start the MCP Bridge (Local Coding Specialist)
 To enable the agent to perform local code-writing and refactoring (the "Coding Specialist" role), you must start the MCP bridge in a separate terminal:
@@ -139,7 +142,7 @@ cm = ClientManager()  # uses DefaultAzureCredential (az login or service princip
 orchestrator = AgenticOrchestrator(client_manager=cm)
 ```
 
-Set `AZURE_AAIF_PROJECT_ENDPOINT` in your `.env` before running. `AZURE_CLIENT_ID` and `AZURE_TENANT_ID` are optional for local dev (used by the UAMI in the cloud). `AZURE_CLIENT_SECRET` is only needed when using the manual-only `AZURE_AUTH_MODE=sp` local path — never set in CI or cloud environments.
+Set `AZURE_AAIF_PROJECT_ENDPOINT` in your `.env` before running. For plain native `az login` dev, leave `AZURE_CLIENT_ID`/`AZURE_TENANT_ID`/`AZURE_CLIENT_SECRET` empty. For local *container* dev (`AZURE_AUTH_MODE=sp`), set the SP id/tenant; the secret is injected at launch from the central Key Vault by `task dev` (never committed to `.env`, never set in CI or cloud).
 
 ## Code Validation
 ```powershell
@@ -180,7 +183,8 @@ id-helloarch-api (UAMI) ──Azure AI Developer + Cognitive Services User──
 - **Foundry** — AIServices account + `helloarch` project + Mistral model deployments (`mistral-small-2503`, `Mistral-Large-3`, `Codestral-2501`).
 - **ACR** `crhelloarchdev` (admin disabled — pull via UAMI only).
 - **Backend Container App** `ca-helloarch-api` — internal ingress, runs the FastAPI image, identity = user-assigned `id-helloarch-api`. No public `/dispatch`.
-- **Identities & RBAC** — UAMI (AcrPull + Azure AI Developer + Cognitive Services User) and a **credential-less** Service Principal (`sp-helloarch-dev`): no client secret is provisioned (none in state). Local dev uses `az login`; a CI credential attaches later via OIDC federation (ADR-015 fast-follow).
+- **Project diagram storage** `sthelloarchdev` (container `diagrams`) — account keys disabled, blob versioning + soft-delete; holds the Diagram Studio trio (brief + d2 + svg) for multi-session build-forward. **Project-scoped** — dies with `rg-helloarch-dev` (ADR-016 amendment); distinct from platform/knowledge storage.
+- **Identities & RBAC** — a 3-tier identity model (ADR-015): **native host dev** uses `az login`; **local containers** authenticate as the scoped Service Principal `sp-helloarch-dev` via a client secret stored in the central platform Key Vault `kv-platformy-dev` (created out-of-band via `az`, never in Terraform state — the no-secret-in-state invariant holds); **CI** uses OIDC federation; the **cloud runtime** uses the UAMI `id-helloarch-api` (AcrPull + Azure AI Developer + Cognitive Services User). The SP and the UAMI each hold **Storage Blob Data Contributor** on the project diagram account `sthelloarchdev`.
 
 **Provider:** azurerm `~> 4.0` (validated on v4.74.0), azapi `~> 2.0`, azuread `~> 2.0`. Remote state in Azure Storage (ADR-015).
 
