@@ -58,10 +58,18 @@ settings = _Settings()
 # Controls whether the app should prefer interactive Azure CLI login (default)
 # or explicitly use Service Principal credentials from environment variables.
 #
-# Set `AZURE_AUTH_MODE=sp` or `AZURE_AUTH_MODE=service_principal` to force
-# service-principal usage via `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and
-# `AZURE_CLIENT_SECRET`. Default is `cli` which allows `az login` to be used
-# when available; empty SP placeholders in `.env` will be ignored so CLI can
-# continue to work locally.
+# SUPPORTED VALUES:
+#   cli (default) — DefaultAzureCredential prefers `az login`; the cloud runtime
+#                   uses the container's User-Assigned Managed Identity (UAMI);
+#                   CI uses the OIDC federated credential (ADR-015, issue #68).
+#   sp            — MANUAL-ONLY LOCAL PATH. Forces Service Principal credential
+#                   lookup via AZURE_CLIENT_ID, AZURE_TENANT_ID, and
+#                   AZURE_CLIENT_SECRET. Intended exclusively for local testing
+#                   with a manually obtained SP secret — never used by CI or the
+#                   cloud runtime, and AZURE_CLIENT_SECRET is never stored in
+#                   Terraform state or injected into the container environment.
+#
+# Empty SP placeholder values in `.env` are silently removed so the `cli` flow
+# can continue to work alongside a partially-populated .env file.
 AZURE_AUTH_MODE = os.getenv("AZURE_AUTH_MODE", "cli").lower()
 USE_AZURE_SERVICE_PRINCIPAL = AZURE_AUTH_MODE in ("sp", "service_principal", "client_secret")

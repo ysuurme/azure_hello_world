@@ -117,6 +117,49 @@ def test_mistral_models_present() -> None:
         assert dep in content, f"model_deployments default must include {dep}"
 
 
+# --- OIDC federated credential -------------------------------------------
+
+
+def test_federated_identity_credential_defined() -> None:
+    """CI authenticates via OIDC federation, not a stored secret (ADR-015)."""
+    content = MAIN_TF.read_text()
+    assert "azuread_application_federated_identity_credential" in content, (
+        "OIDC federated credential must be defined on the application"
+    )
+
+
+def test_oidc_issuer_github_actions() -> None:
+    content = MAIN_TF.read_text()
+    assert "https://token.actions.githubusercontent.com" in content, (
+        "OIDC issuer must be the GitHub Actions token endpoint"
+    )
+
+
+def test_oidc_subject_master_branch() -> None:
+    content = MAIN_TF.read_text()
+    assert "repo:ysuurme/azure_hello_world:ref:refs/heads/master" in content, (
+        "OIDC subject must target the master branch of the repository"
+    )
+
+
+# --- CI principal: Storage Blob Data Contributor on tfstate --------------
+
+
+def test_sp_tfstate_blob_contributor_defined() -> None:
+    """CI principal needs write on tfstate for blob-lease locking during terraform apply."""
+    content = MAIN_TF.read_text()
+    assert '"Storage Blob Data Contributor"' in content, (
+        "CI principal must be granted Storage Blob Data Contributor on the tfstate container"
+    )
+
+
+def test_sp_tfstate_platform_storage_referenced() -> None:
+    content = MAIN_TF.read_text()
+    assert "stplatformydev" in content, (
+        "Storage Blob Data Contributor grant must reference the platform state account stplatformydev"
+    )
+
+
 # --- Service Principal & RBAC --------------------------------------------
 
 

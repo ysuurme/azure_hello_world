@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted — OIDC fast-follow completed in issue #68
 
 ## Context and Problem Statement
 
@@ -29,7 +29,7 @@ The platform RG is long-lived and project-agnostic: one state account backs ever
 **Secrets stance: harden the backend; do not introduce Key Vault for this concern.** The load-bearing insight is that *anything Terraform manages lands in state in plaintext* — so Key Vault as a write destination does not remove a Terraform-generated secret from state. Key Vault is therefore not a solution to secret-in-state and is deferred until a genuine runtime secret (one that managed identity cannot cover) exists, consistent with [ADR-008](ADR-008-secrets-management.md) designating Key Vault as the production-corporate store.
 
 Instead, in priority order:
-1. **Eliminate secrets** — the cloud path is already secretless via managed identity (UAMI → ACR + Foundry); local dev uses `az login` + `DefaultAzureCredential`. Removing the optional Service Principal password (and using OIDC workload-identity federation for CI) is tracked as a fast-follow.
+1. **Eliminate secrets** — the cloud path is already secretless via managed identity (UAMI → ACR + Foundry); local dev uses `az login` + `DefaultAzureCredential`. The optional Service Principal password has been removed; CI authenticates via OIDC workload-identity federation (completed in issue #68, superseding the SP-password portion of ADR-013). `AZURE_AUTH_MODE=sp` is retained solely as a **manual-only local path** — `AZURE_CLIENT_SECRET` is never stored in Terraform state or injected into CI or cloud environments.
 2. **Harden the state backend** (this ADR) — RBAC/Entra-only (`--allow-shared-key-access false`, `use_azuread_auth = true`), no public blob access, blob versioning + soft-delete for recovery. Encryption at rest is on by default. This protects the residual secrets that always leak into state.
 
 ### Positive Consequences
@@ -43,7 +43,7 @@ Instead, in priority order:
 
 - A one-time manual bootstrap (`az` commands in README) is required before `terraform init -migrate-state`, since the backend cannot provision the account it depends on (chicken-and-egg).
 - The platform RG/account is now a shared dependency whose deletion would affect every project's state — it must be treated as protected infrastructure.
-- Secrets still reside in state until the SP-password elimination fast-follow lands; backend hardening is the interim mitigation.
+- ~~Secrets still reside in state until the SP-password elimination fast-follow lands; backend hardening is the interim mitigation.~~ Resolved in issue #68: the SP password was removed and CI now uses OIDC federation; no extractable secret lands in state.
 
 ## Pros and Cons of the Options
 
