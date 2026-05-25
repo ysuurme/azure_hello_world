@@ -188,7 +188,8 @@ def test_service_principal_defined() -> None:
 
 
 def test_sp_password_not_defined() -> None:
-    """SP password eliminated: auth flows via managed identity (cloud) / az login (local) / OIDC (CI) — no long-lived secret in state."""
+    """SP password eliminated: auth flows via managed identity (cloud), az login (local),
+    and OIDC (CI) — no long-lived secret in Terraform state."""
     content = MAIN_TF.read_text()
     assert "azuread_service_principal_password" not in content, (
         "SP password must not be defined — no extractable secret should land in Terraform state"
