@@ -1,9 +1,16 @@
+import re
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.agents._refinement import GrillQuestion, GrillRound
-from src.agents.diagram_studio import DiagramBrief, DiagramStudioModule, ModuleResponse
+from src.agents.diagram_studio import (
+    _D2_PATTERN,
+    _D2_SYSTEM_PROMPT,
+    DiagramBrief,
+    DiagramStudioModule,
+    ModuleResponse,
+)
 from src.utils.m_diagram_store import DiagramRecord, DiagramSummary
 
 
@@ -428,3 +435,40 @@ class TestDiagramSubcommands:
         result = module.handle("/diagram delete payment", {})
         module._store.delete.assert_called_once_with("payment")
         assert "Deleted" in result.response_text
+
+
+class TestSystemPromptAnchor:
+    """Anchor section is present in _D2_SYSTEM_PROMPT and output-contract regex is intact."""
+
+    def test_system_prompt_ends_with_d2_anchor_block(self):
+        assert _D2_SYSTEM_PROMPT.rstrip().endswith("```")
+        assert "```d2" in _D2_SYSTEM_PROMPT
+
+    def test_anchor_contains_direction_declaration(self):
+        assert "direction:" in _D2_SYSTEM_PROMPT
+
+    def test_anchor_references_all_semantic_classes(self):
+        for cls in ("service", "datastore", "queue", "external", "boundary"):
+            assert f"class: {cls}" in _D2_SYSTEM_PROMPT, f"Anchor missing semantic class: {cls}"
+
+    def test_anchor_demonstrates_glob_base_style(self):
+        assert "*.style" in _D2_SYSTEM_PROMPT
+
+    def test_anchor_contains_nested_boundary_container(self):
+        assert "class: boundary" in _D2_SYSTEM_PROMPT
+
+    def test_anchor_contains_per_node_style_override(self):
+        assert "style.fill:" in _D2_SYSTEM_PROMPT
+
+    def test_anchor_contains_labelled_edges(self):
+        assert re.search(r"->\s+\w[\w.]*\s*:", _D2_SYSTEM_PROMPT)
+
+    def test_output_contract_regex_matches_d2_fence(self):
+        sample = '```d2\ndirection: right\nA -> B: "request"\n```'
+        assert _D2_PATTERN.search(sample) is not None
+
+    def test_output_contract_regex_captures_body(self):
+        body = 'direction: right\nA -> B: "request"'
+        match = _D2_PATTERN.search(f"```d2\n{body}\n```")
+        assert match is not None
+        assert body in match.group(1)
