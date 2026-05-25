@@ -216,6 +216,8 @@ az cognitiveservices account purge -g rg-helloarch-dev -n aaif-helloarch-dev -l 
 
 > **Caveat:** local `docker compose` may still run an image built before the Dockerfile `/app` permission fix (`chown` + switch user *after* COPYs). A `docker compose build` picks up the deterministic fix.
 
+> **Known interim (ADR-016):** the cloud image ships only `src/` + the venv, not `capabilities/` or `architecture/`. So in the cloud, `/diagram` is fully functional but `/design` degrades to default WAF guidance and a stub intake template. These are being externalized to cloud storage for runtime retrieval (see `ISSUES.md`); not baked into the image.
+
 ---
 
 ## Agent Skills Framework (`.agents/skills/`)

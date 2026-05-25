@@ -101,3 +101,74 @@ Local dev uses `az login` + `DefaultAzureCredential` (CONTEXT §4); cloud uses t
 - `uv run pytest` passes.
 END_ISSUE
 
+ISSUE: Externalize capabilities corpus to cloud storage with runtime retrieval (Phase 1)
+LABELS: HITL
+ESTIMATE: 8
+PRIORITY: P3
+
+**Goal**
+Move the reusable capabilities knowledge base out of the container image and into Azure Blob Storage, retrieved at runtime via the backend UAMI. Today `utils.m_search` and `utils.m_capability_repo` read `PROJECT_ROOT/capabilities` from local disk; the image does not ship it, so cloud `/design` degrades to default WAF guidance. Implements the capabilities half of ADR-016.
+
+**Description**
+Capabilities are cross-project reusable knowledge → a shared/global knowledge store, kept separate from project-local artifacts and from the `tfstate` container. Git remains the authoring source of truth; a publish step syncs to blob. Retrieval is direct blob read via `DefaultAzureCredential` (UAMI in cloud, `az login` locally) with an ephemeral cache. HITL decisions: which account hosts the `knowledge` container (platform account with scoped RBAC vs a dedicated knowledge account), and the publish trigger (CI on merge vs manual).
+
+**Requirements**
+- Provision a `knowledge` (capabilities) blob container, hardened per ADR-015 (RBAC-only, no public, versioning + soft-delete).
+- Grant the backend UAMI `Storage Blob Data Reader` on that container only (never `tfstate`).
+- Refactor `m_search` / `m_capability_repo` to read capability records from blob (keep the local path as a dev fallback), with an ephemeral in-container cache.
+- Add a git→blob publish/sync step for `capabilities/` content.
+- Update `config` paths and the `Dockerfile`/`.dockerignore` so capabilities are no longer expected on the image filesystem.
+
+**Acceptance Criteria**
+- Cloud `/design` retrieves real capability records (no "default WAF guidance" fallback) with the image containing no `capabilities/` directory.
+- Updating a capability in blob is reflected at runtime without an image rebuild.
+- UAMI has no data-plane access to the `tfstate` container.
+- `uv run pytest` passes.
+END_ISSUE
+
+ISSUE: Externalize project architecture artifacts (template + designs) to cloud storage
+LABELS: HITL
+ESTIMATE: 5
+PRIORITY: P3
+
+**Goal**
+Move project-scoped architecture artifacts to a project blob store: the intake template the app reads (`config.TEMPLATE_PATH` → `architecture/000_architecture_template.md`) and the approved designs `utils.m_persist_design` writes (currently `PROJECT_ROOT/designs`). Implements the project-artifacts half of ADR-016.
+
+**Description**
+Unlike the global capabilities corpus, these are project-scoped — the template is this app's input, designs are its outputs. The store should live with the project (torn down by `az group delete rg-helloarch-dev`). HITL decision: a project storage account in `rg-helloarch-dev` vs a project-prefixed container in a shared account. The app needs read on the template and read/write on designs.
+
+**Requirements**
+- Provision a project blob store (account or container) for `template` and `designs`, hardened per ADR-015.
+- Grant the backend UAMI read on the template and read/write on the designs location.
+- Refactor `intake_reviewer` to load the template from blob (keep local fallback) and `m_persist_design` to persist approved designs to blob.
+- Update `config` paths; remove the image's reliance on `architecture/` on disk and adjust `.dockerignore` accordingly.
+
+**Acceptance Criteria**
+- Cloud `/design` loads the real intake template (no stub fallback) and persists approved designs to blob.
+- Generated designs survive container restarts (no longer in ephemeral container storage).
+- `uv run pytest` passes.
+END_ISSUE
+
+ISSUE: Reintroduce Azure AI Search for semantic capability retrieval (Phase 2)
+LABELS: HITL
+ESTIMATE: 8
+PRIORITY: P4
+
+**Goal**
+Upgrade capability retrieval from direct blob reads (Phase 1) to semantic search over Azure AI Search, realising the RAG design `utils.m_search` currently simulates and `utils.m_ingest` already targets (idempotent SHA256-hashed ingestion). Phase 2 of ADR-016.
+
+**Description**
+`m_ingest` is built for AI Search ingestion with content-hash idempotency; `m_search` today fakes the index by scanning local files. ADR-013 deliberately orphaned the legacy Basic-SKU Search during consolidation, so this is a conscious re-add with recurring cost — needs its own cost/SKU decision (HITL) before provisioning. Depends on the capabilities corpus living in blob (Phase 1 issue).
+
+**Requirements**
+- Decide AI Search SKU/region and record the cost trade-off (ADR addendum to ADR-016/ADR-013).
+- Provision the AI Search service + index as IaC in `infra/`.
+- Wire `m_ingest` to populate the index from the blob capabilities corpus; wire `m_search` to query the real index instead of scanning local files.
+- Grant the backend UAMI the AI Search query role; ingestion identity gets the index-write role.
+
+**Acceptance Criteria**
+- `/design` capability retrieval returns semantically ranked results from Azure AI Search.
+- Re-ingesting unchanged content is a no-op (hash idempotency verified).
+- `uv run pytest` passes.
+END_ISSUE
+

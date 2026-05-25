@@ -4,6 +4,7 @@
 .vscode
 .devcontainer
 .gemini
+.claude
 .agents
 __pycache__
 .pytest_cache
