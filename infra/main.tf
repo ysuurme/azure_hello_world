@@ -16,7 +16,7 @@ resource "azapi_resource" "foundry" {
     type = "SystemAssigned"
   }
 
-  body = jsonencode({
+  body = {
     kind = "AIServices"
     sku  = { name = "S0" }
     properties = {
@@ -24,7 +24,7 @@ resource "azapi_resource" "foundry" {
       customSubDomainName    = var.foundry_account_name
       publicNetworkAccess    = "Enabled"
     }
-  })
+  }
 
   response_export_values = ["properties.endpoint"]
 }
@@ -40,11 +40,11 @@ resource "azapi_resource" "project" {
     type = "SystemAssigned"
   }
 
-  body = jsonencode({
+  body = {
     properties = {
       displayName = var.foundry_project_display_name
     }
-  })
+  }
 }
 
 # --- Model deployments (Mistral stack; non-OpenAI, OpenAI-client compatible) ---
@@ -168,7 +168,7 @@ resource "azurerm_container_app" "api" {
 
     container {
       name    = "api"
-      image   = "${azurerm_container_registry.acr.login_server}/helloarch:latest"
+      image   = "${azurerm_container_registry.acr.login_server}/helloarch:${var.image_tag}"
       cpu     = 0.5
       memory  = "1Gi"
       command = ["uvicorn"]

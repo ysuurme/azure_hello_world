@@ -58,6 +58,12 @@ variable "backend_app_name" {
   default     = "ca-helloarch-api"
 }
 
+variable "image_tag" {
+  type        = string
+  description = "Tag of the helloarch backend image to deploy. CD should pass the git SHA so revisions are deterministic; 'latest' is a local-dev fallback only."
+  default     = "latest"
+}
+
 variable "model_deployments" {
   type = map(object({
     name    = string

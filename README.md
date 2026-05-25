@@ -182,16 +182,47 @@ id-helloarch-api (UAMI) ──Azure AI Developer + Cognitive Services User──
 - **Backend Container App** `ca-helloarch-api` — internal ingress, runs the FastAPI image, identity = user-assigned `id-helloarch-api`. No public `/dispatch`.
 - **Identities & RBAC** — UAMI (AcrPull + Azure AI Developer + Cognitive Services User) and a Service Principal (`sp-helloarch-dev`) for local/SP auth.
 
-**Provider:** azurerm `~> 4.0` (validated on v4.74.0), azapi `~> 2.0`, azuread `~> 2.0`. Local state (gitignored); no remote backend yet.
+**Provider:** azurerm `~> 4.0` (validated on v4.74.0), azapi `~> 2.0`, azuread `~> 2.0`. Remote state in Azure Storage (ADR-015).
+
+**State backend (one-time bootstrap):** state lives in a shared, project-agnostic platform resource group (`rg-platformy-dev`) so `az group delete rg-helloarch-dev` never destroys its own state. The backing account is hardened — RBAC-only (no account keys), no public blob access, blob versioning for recovery. Run once:
+```powershell
+az group create -n rg-platformy-dev -l swedencentral
+az storage account create -n stplatformydev -g rg-platformy-dev -l swedencentral `
+  --sku Standard_LRS --min-tls-version TLS1_2 `
+  --allow-blob-public-access false --allow-shared-key-access false
+az storage account blob-service-properties update `
+  --account-name stplatformydev --enable-versioning true
+az storage container create -n tfstate --account-name stplatformydev --auth-mode login
+# grant yourself data-plane access (RBAC-only account):
+az role assignment create --role "Storage Blob Data Contributor" `
+  --assignee (az ad signed-in-user show --query id -o tsv) `
+  --scope (az storage account show -n stplatformydev -g rg-platformy-dev --query id -o tsv)
+```
 
 ```powershell
 # azurerm v4 requires a subscription at plan/apply (validate does not):
 $env:ARM_SUBSCRIPTION_ID = (az account show --query id -o tsv)
 
 cd infra
-terraform init
-terraform validate     # passes
+terraform init -migrate-state   # first run after bootstrap; moves local state to the blob
+terraform validate
 terraform plan
+```
+
+**Image tag:** the backend image is referenced by `var.image_tag` (default `latest`). CD should pass the git SHA (`-var "image_tag=$(git rev-parse --short HEAD)"`) so each revision is deterministic and Terraform detects image changes.
+
+**First-apply ordering (cold start):** the Container App references an image that does not exist in ACR until it is pushed. On a clean apply, provision the registry + identity first, push the image, then apply the app:
+```powershell
+terraform apply -target=azurerm_container_registry.acr -target=azurerm_user_assigned_identity.api
+# build & push helloarch:<tag> to crhelloarchdev, then:
+terraform apply
+```
+
+**Resource-provider registration:** auto-registration is disabled (`resource_provider_registrations = "none"`); the stack registers exactly its namespaces via `resource_providers_to_register`. If your identity lacks `/register/action`, register them by hand: `az provider register --namespace "Microsoft.App"` (repeat per namespace).
+
+**Teardown (Cognitive Services soft-delete):** `az group delete -n rg-helloarch-dev` deletes the RG, but the Foundry/AIServices account is **soft-deleted** — recreating `aaif-helloarch-dev` afterwards fails until it is purged:
+```powershell
+az cognitiveservices account purge -g rg-helloarch-dev -n aaif-helloarch-dev -l swedencentral
 ```
 
 **Status:** Backend is deployed and validated end-to-end (`/healthz` → ok, `/diagram` → SVG via UAMI→Foundry).

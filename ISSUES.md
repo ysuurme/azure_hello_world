@@ -78,3 +78,27 @@ Default new issues to **P3** (new work) or **P4** (improvement). Escalation to P
 
 <!-- ISSUES -->
 
+ISSUE: Eliminate Service Principal secret from Terraform state (managed identity + OIDC)
+LABELS: HITL
+ESTIMATE: 5
+PRIORITY: P4
+
+**Goal**
+Stop persisting a live credential in Terraform state. The only secret-bearing resource in the `infra/` stack is `azuread_service_principal_password.helloarch`, whose value lands in state in plaintext and is exposed via the `sp_client_secret` output. The cloud path is already secretless (UAMI → ACR + Foundry); this issue removes the residual secret. Fast-follow to ADR-015 (state-backend hardening was the interim mitigation).
+
+**Description**
+The Service Principal (`sp-helloarch-dev`) exists only for optional local `AZURE_AUTH_MODE=sp`. Local dev already works via `az login` + `DefaultAzureCredential` (CONTEXT §4), and CI (when added) should authenticate to Azure via OIDC workload-identity federation — neither needs a static secret. Decision required (HITL): remove the SP entirely, or keep the application object but replace the password with a federated credential. This supersedes the SP-password portion of ADR-013.
+
+**Requirements**
+- Remove `azuread_service_principal_password.helloarch` and the `sp_client_secret` output from `infra/`.
+- Confirm local dev guidance is `az login` + `DefaultAzureCredential`; update README so SP/secret env vars are no longer presented as a path.
+- If CI auth to Azure is needed, add `azuread_application_federated_identity_credential` for the GitHub Actions OIDC subject instead of a secret.
+- Record the decision as an ADR amendment/superseding note referencing ADR-013 and ADR-015.
+
+**Acceptance Criteria**
+- `terraform plan` shows no `azuread_service_principal_password` resource and no secret-valued output.
+- `git grep sp_client_secret` returns no matches in `infra/`.
+- README Cloud Deployment section no longer instructs setting `AZURE_CLIENT_SECRET` for the cloud/CI path.
+- `uv run pytest` passes.
+END_ISSUE
+

@@ -67,7 +67,7 @@ The Streamlit chat is a thin surface that calls `WorkflowDispatcher.dispatch(use
 
 Use this module map to pinpoint the relevant files for your task and avoid loading unnecessary files into context.
 
-> **Infrastructure lives in `infra/` (Terraform), intentionally outside this Python module map.** It provisions the Azure cloud backend — ACR + user-assigned identity + Container Apps + Foundry — secretless via managed identity. azurerm `~> 4.0`, local state. See README → *Cloud Deployment (Azure)*. Do not add `infra/` resources to the fan-in/out table below; it tracks `src/` modules only.
+> **Infrastructure lives in `infra/` (Terraform), intentionally outside this Python module map.** It provisions the Azure cloud backend — ACR + user-assigned identity + Container Apps + Foundry — secretless via managed identity. azurerm `~> 4.0`, remote state in a shared platform RG (ADR-015). See README → *Cloud Deployment (Azure)*. Do not add `infra/` resources to the fan-in/out table below; it tracks `src/` modules only.
 
 ### Module Fan-in/Fan-out Summary
 

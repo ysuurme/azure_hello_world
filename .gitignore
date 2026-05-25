@@ -17,6 +17,8 @@ local.settings.json
 .vs/
 .vscode/
 .idea/
+.gemini
+.claude
 *.code-workspace
 
 # OS
@@ -35,7 +37,6 @@ designs/
 
 # Agent planning artifacts (ephemeral, auto-generated)
 .planning/
-docs/CODEBASE_MAP.md
 
 # Linting & Testing
 .ruff_cache/
