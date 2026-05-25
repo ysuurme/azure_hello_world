@@ -1,0 +1,130 @@
+name: Terraform Plan (infra)
+
+# Runs on every PR that touches infra/ — surfaces the plan diff for review and
+# fails only on a plan error (exit 1). Exit 2 (changes present) is expected on
+# infra PRs and must not fail the check. test-and-lint is unaffected because
+# this is a separate workflow file, not a job added to pr-checks.yml.
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'infra/**'
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+jobs:
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    env:
+      # azurerm v4 requires ARM_SUBSCRIPTION_ID at plan time even when using
+      # OIDC. ARM_USE_OIDC=true tells the provider to exchange the GitHub
+      # OIDC token directly rather than using a client secret.
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_USE_OIDC: "true"
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          # Disable the wrapper so PIPESTATUS captures the raw terraform exit
+          # code; the wrapper would intercept stdout and mask exit 2.
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform -chdir=infra init
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          set +e
+          terraform -chdir=infra plan \
+            -detailed-exitcode \
+            -no-color \
+            -lock=false \
+            -out=tfplan \
+            2>&1 | tee plan_output.txt
+          PLAN_EXIT="${PIPESTATUS[0]}"
+          echo "exit_code=${PLAN_EXIT}" >> "$GITHUB_OUTPUT"
+          # exit 0 = no changes (pass), exit 2 = changes present (surfaced, not failed)
+          # exit 1 = plan error — block the check
+          [ "$PLAN_EXIT" -eq 1 ] && exit 1
+          exit 0
+
+      - name: Post plan as PR comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            let planOutput = '';
+            try {
+              planOutput = fs.readFileSync('plan_output.txt', 'utf8');
+            } catch (_) {
+              planOutput = 'Plan output not available.';
+            }
+
+            const exitCode = '${{ steps.plan.outputs.exit_code }}';
+            const statusEmoji = exitCode === '0' ? '✅' : exitCode === '2' ? '⚠️' : '❌';
+            const statusText =
+              exitCode === '0' ? 'No changes' :
+              exitCode === '2' ? 'Changes detected' :
+              'Plan failed';
+
+            const output = planOutput.length > 60000
+              ? planOutput.substring(0, 60000) + '\n... (truncated)'
+              : planOutput;
+
+            const marker = '<!-- terraform-plan -->';
+            const body = `${marker}
+## Terraform Plan ${statusEmoji} — ${statusText}
+
+<details>
+<summary>Plan output</summary>
+
+\`\`\`hcl
+${output}
+\`\`\`
+
+</details>
+
+*Commit \`${{ github.event.pull_request.head.sha }}\` · [Run #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})*`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
