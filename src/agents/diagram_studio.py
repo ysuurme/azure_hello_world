@@ -13,16 +13,33 @@ from src.utils.m_log import f_log
 from src.utils.m_persist_design import _brief_to_markdown
 
 _D2_SYSTEM_PROMPT = (
-    "You are a D2 diagram code generator. "
-    "Convert the DiagramBrief JSON into valid D2 syntax. "
-    "Use shapes, connections, and labels to represent the components and relationships accurately. "
-    "Apply the layout_direction from the brief. "
-    "Return ONLY a single ```d2 ... ``` code block — no prose before or after."
+    "You are an expert D2 diagram author. Convert the DiagramBrief JSON into clean, valid, visually "
+    "polished D2. Return ONLY a single ```d2 ... ``` code block — no prose.\n\n"
+    "Author it like a real architecture diagram, not a row of identical boxes:\n"
+    "- Start with `direction: <layout_direction>`.\n"
+    "- GROUPING: when components share a `group`, nest them in a D2 container so you get blocks-in-blocks, "
+    'e.g.\n  ingress: "Ingress" {\n    gateway: "API Gateway"\n    auth: "Auth"\n  }\n'
+    "- PALETTE (not monochrome): define classes and tag each shape by role. Example:\n"
+    "  classes: {\n"
+    '    service: { style: { fill: "#e8f0fe"; stroke: "#1a73e8"; border-radius: 8 } }\n'
+    '    datastore: { shape: cylinder; style: { fill: "#fce8e6"; stroke: "#c5221f" } }\n'
+    '    queue: { shape: hexagon; style: { fill: "#fef7e0"; stroke: "#f9ab00" } }\n'
+    '    external: { style: { fill: "#f1f3f4"; stroke: "#5f6368"; stroke-dash: 3 } }\n'
+    "  }\n"
+    "  then `order_svc.class: service`, `db.class: datastore`, etc. Map the brief's `shape` and pick the "
+    "class that fits each component's role.\n"
+    "- RELATIONSHIPS: label every edge with what flows. Solid arrow for synchronous calls; dashed for "
+    'async/events, e.g. `services.order_svc -> bus.queue: emits { style.stroke-dash: 4 }`. ALWAYS '
+    "reference nested shapes by their FULL container path so edges connect the real nodes instead of "
+    "spawning new empty top-level ones.\n"
+    "- Stay faithful to the brief — do NOT invent components that are not in it.\n"
+    "- The output MUST compile as valid D2."
 )
 
 _D2_PATTERN = re.compile(r"```d2\n(.*?)```", re.DOTALL)
 
 _APPROVAL_PHRASES = frozenset({"yes", "approved", "looks good", "lgtm", "ship it"})
+_RENDER_PHRASES = frozenset({"render", "draw", "draw it", "show me", "generate", "generate now", "good enough"})
 
 
 @dataclass
@@ -68,11 +85,16 @@ def _format_grill_questions(questions: list) -> str:
     for i, q in enumerate(questions, 1):
         lines.append(f"**Q{i}:** {q.question}")
         lines.append(f"**Recommended:** {q.recommendation}\n")
+    lines.append("_Answer to refine further, or reply `render` to draw the current draft now._")
     return "\n".join(lines)
 
 
 def _is_approved(user_input: str) -> bool:
     return user_input.strip().lower() in _APPROVAL_PHRASES
+
+
+def _wants_render(user_input: str) -> bool:
+    return user_input.strip().lower() in _RENDER_PHRASES
 
 
 def _brief_dict_to_dataclass(brief: dict) -> DiagramBrief:
@@ -201,6 +223,9 @@ class DiagramStudioModule(RefinementMixin):
         )
 
     def _grill_turn(self, user_input: str, module_state: dict) -> ModuleResponse:
+        if _wants_render(user_input):
+            f_log("DiagramStudioModule: user requested intermediate render.", level="process")
+            return self._generate_diagram(module_state.get("brief", {}), module_state)
         description = module_state.get("description", "")
         current_brief = module_state.get("brief", {})
         round_num = module_state.get("round", 1) + 1
