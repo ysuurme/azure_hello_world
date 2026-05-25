@@ -27,8 +27,8 @@ Chosen: **Option C — externalize both the capabilities corpus and the project 
 
 Design principles (details deferred to the implementing issues, where the open decisions are HITL):
 
-- **Two stores, by reuse scope.** The **capabilities corpus** is cross-project reusable knowledge → a shared/global knowledge store. The **intake template and generated designs** are project-scoped → a project store (torn down with `rg-helloarch-dev`). This honours the "global knowledge base separate from project-local" constraint.
-- **Git authors, blob serves.** Git remains the source of truth for authored knowledge (so changes are reviewed via PR); a publish/sync step writes to blob. Blob **versioning + soft-delete** is the runtime safety net (same hardening pattern as ADR-015 state).
+- **Two containers in the platform storage account, by reuse scope.** Both stores live in the platform account (`stplatformydev` for dev, `stplatformyprod` for prod — environment is the account boundary, per ADR-015 layering), as distinct, clearly-named containers: a `capabilities` container (cross-project reusable knowledge, kept separate from project-local artifacts) and a `designs` container (project-scoped intake template + generated designs, keyed by a project prefix, e.g. `helloarch/`). Trade-off accepted deliberately: project designs now persist beyond `az group delete rg-helloarch-dev` — generated outputs survive teardown of the ephemeral compute, rather than dying with it.
+- **Blob is the version control.** Content is managed directly in blob, with **versioning + soft-delete** providing history and rollback. DEV and PRD are separated by environment (separate platform accounts), not by git branches. Accepted trade-off: knowledge edits are not PR-reviewed; in exchange, content is environment-scoped, directly editable, and independently versioned. Operators inspect and validate content with a blob viewer (Azure Storage Explorer, the VS Code Azure Storage extension, or the portal Storage browser).
 - **Retrieval phased.** Phase 1: app reads blobs directly via the UAMI and caches in container ephemeral storage. Phase 2: reintroduce **Azure AI Search** for semantic retrieval — `m_search` currently *simulates* this and `m_ingest` already has idempotent SHA256-hashed ingestion. Note ADR-013 orphaned the legacy Basic-SKU Search; Phase 2 is a deliberate re-add with its own cost consideration.
 - **Access isolation.** The app's UAMI gets data-plane read on the knowledge container only — never the `tfstate` container (different access population; see the storage-layering rationale in ADR-015).
 
@@ -36,13 +36,13 @@ Design principles (details deferred to the implementing issues, where the open d
 
 - Capability/template/design updates need no image rebuild or redeploy.
 - All revisions and instances share one versioned content source.
-- Content is reviewable (git) and recoverable (blob versioning).
+- Content is environment-scoped (dev/prd by account) and recoverable via blob versioning; inspectable with a blob viewer.
 - Removes the silent `/design` degradation once Phase 1 lands.
 
 ### Negative Consequences
 
 - Runtime now depends on blob availability and a data-plane RBAC grant (mitigated by ephemeral caching).
-- A publish/sync step is added between git and blob.
+- Knowledge edits bypass PR review (blob is the VC); versioning + soft-delete and disciplined editing compensate.
 - Phase 2 reintroduces Azure AI Search — added cost and an ingestion pipeline to operate.
 
 ## Pros and Cons of the Options

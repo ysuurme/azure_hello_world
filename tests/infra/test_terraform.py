@@ -52,9 +52,11 @@ def test_azuread_provider_declared() -> None:
     assert 'source  = "hashicorp/azuread"' in content, "azuread provider must be declared in providers.tf"
 
 
-def test_local_state_no_remote_backend() -> None:
+def test_remote_state_backend_configured() -> None:
+    """State lives in the shared platform storage account, not on disk (ADR-015)."""
     content = PROVIDERS_TF.read_text()
-    assert 'backend "azurerm"' not in content, "Stack uses local state; no remote azurerm backend should be configured"
+    assert 'backend "azurerm"' in content, "Stack must configure the azurerm remote backend (ADR-015)"
+    assert "stplatformydev" in content, "backend must point at the platform state account stplatformydev"
 
 
 def test_no_stale_backend_storage_references() -> None:
@@ -123,9 +125,12 @@ def test_service_principal_defined() -> None:
     assert "azuread_service_principal" in content, "stack must define azuread_service_principal"
 
 
-def test_sp_password_defined() -> None:
+def test_sp_password_not_defined() -> None:
+    """SP password eliminated: auth flows via managed identity (cloud) / az login (local) / OIDC (CI) — no long-lived secret in state."""
     content = MAIN_TF.read_text()
-    assert "azuread_service_principal_password" in content, "stack must define the SP password"
+    assert "azuread_service_principal_password" not in content, (
+        "SP password must not be defined — no extractable secret should land in Terraform state"
+    )
 
 
 def test_role_assignment_ai_developer() -> None:
@@ -189,10 +194,12 @@ def test_sp_client_id_output() -> None:
     assert "sp_client_id" in content, "outputs.tf must export sp_client_id"
 
 
-def test_sp_client_secret_output_sensitive() -> None:
+def test_sp_client_secret_output_absent() -> None:
+    """No client-secret output: the SP secret was eliminated, so nothing secret-valued is exported."""
     content = OUTPUTS_TF.read_text()
-    assert "sp_client_secret" in content, "outputs.tf must export sp_client_secret"
-    assert "sensitive   = true" in content, "sp_client_secret output must be marked sensitive"
+    assert "sp_client_secret" not in content, (
+        "sp_client_secret output must not exist — auth via managed identity, no secret to export"
+    )
 
 
 # --- Container Registry + Container Apps -----------------------------------
