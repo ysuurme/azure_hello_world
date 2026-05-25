@@ -6,7 +6,7 @@ description: Diagram Studio module — first capability under ADR-010; refines a
 # ADR-011: Diagram Studio Module with Native D2 Sketch Rendering
 
 ## Status
-Accepted
+Accepted — amended (ELK layout engine, 2026-05-25)
 
 ## applies_to
 application, agent
@@ -56,6 +56,35 @@ Chosen option: **Option A**, because (i) engine-level `--sketch` makes the style
 * `src/agents/architecture_composer.py` system prompt no longer references `theme: sketch` — sketch styling is no longer a composer concern.
 * Tests in `tests/agents/test_diagram_studio.py` cover: grill round produces questions with recommendations, brief approval gate works, generated D2 is non-empty, rendered SVG bytes are produced, brief/D2/SVG trio is persisted.
 * Revisit when (a) users repeatedly skip the grill and just want one-shot generation — signal that the `/diagram --quick` escape hatch should be promoted; or (b) the `DiagramBrief` schema has been forked for two other modules — signal that the mixin should be promoted to a full base class.
+
+## Amendment: ELK Layout Engine (2026-05-25)
+
+### Context
+
+The original decision enforced `--sketch` at the engine level but left the layout engine at the D2 default (`dagre`). Dagre is unmaintained and routes poorly through deep container nesting and ancestor→descendant edges, producing illegible blocks-in-blocks output. The bundled D2 binary ships ELK; ELK's orthogonal routing guarantees edges between nested children do not cut through unrelated parent containers.
+
+### Decision
+
+`DiagramStyle` gains a `layout_engine: str = "elk"` field. `DiagramEngine.generate_svg` appends `--layout <style.layout_engine>` to the D2 CLI invocation alongside the existing `--sketch`/`--theme`/`--pad` flags. The engine is overridable via `DiagramStyle(layout_engine="dagre")` when the caller has a specific reason.
+
+`_DEFAULT_CONVENTIONS` is extended with direction-selection heuristics:
+- `direction: right` — temporal/streaming/pipeline flows (data moves left-to-right through stages)
+- `direction: down` — multi-tier infrastructure stacks (client → gateway → service → data tiers)
+
+### In-container verification
+
+The smoke test suite (`@pytest.mark.integration`) calls the real D2/ELK binary with a nested-container diagram that exercises ancestor→descendant edges (blocks-in-blocks). Run it inside the container:
+
+```bash
+# Inside a running container:
+uv run pytest -m integration -v
+
+# One-shot verification without the test suite:
+echo 'direction: down\nouter: { a: "A"; a.class: service\n  b: "B"; b.class: datastore\n}\nouter.a -> outer.b: write' \
+  | d2 --layout elk - /tmp/test.svg && echo "ELK OK: $(wc -c < /tmp/test.svg) bytes"
+```
+
+Verified locally (Windows, D2 v0.7.1 with bundled ELK): nested-container D2 with ancestor→descendant edges renders to SVG without routing errors.
 
 ## Pros and Cons of the Options
 
