@@ -5,6 +5,10 @@ services:
     ports:
       - "8000:8000"
     env_file: .env
+    environment:
+      # Injected from kv-platformy-dev at launch by `task dev`; never stored on disk.
+      # The :? guard fails the run if the secret was not exported (i.e. not launched via the task).
+      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET:?run via 'task dev' so the SP secret is fetched from Key Vault}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
       interval: 30s
