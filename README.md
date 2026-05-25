@@ -100,8 +100,8 @@ To run this application locally, you must satisfy the following environment and 
 5.  **Environment Variables**: Create a `.env` file in the project root with:
     - `AZURE_AAIF_PROJECT_ENDPOINT`: The endpoint for your AI Foundry project (e.g., `https://<REGION>.api.azureml.ms`).
     - (Optional) `SECOND_BRAIN_PATH`: Absolute path to your local `my_second_brain` repository (e.g., `/home/user/my_second_brain`). When set, `CapabilityRepository` reads from `$SECOND_BRAIN_PATH/capabilities/` and approved designs are written to `$SECOND_BRAIN_PATH/architecture/designs/approved/`. If unset, the engine falls back to local project directories (safe for CI).
-    - (Optional) `AZURE_AUTH_MODE`: Set to `cli` (default) for `az login` or `sp` for Service Principal.
-    - (Optional) `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_SECRET`: Required if `AZURE_AUTH_MODE=sp`.
+    - (Optional) `AZURE_AUTH_MODE`: Set to `cli` (default) for `az login`. The `sp` value is a **manual-only local path** — it forces Service Principal credential lookup via `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_CLIENT_SECRET`; it is never used by CI (which authenticates via OIDC federation) or the cloud runtime (which uses the UAMI).
+    - (Optional) `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_SECRET`: Only required when `AZURE_AUTH_MODE=sp` for manual local SP testing. Leave empty for normal `az login` usage.
 6.  **Model Deployments**: Ensure the following models are deployed in your AI Foundry project with names matching `config.py`:
     - `gpt-5-mini` (Intake Reviewer)
     - `DeepSeek-V3.1` (Architecture Composer)
@@ -139,7 +139,7 @@ cm = ClientManager()  # uses DefaultAzureCredential (az login or service princip
 orchestrator = AgenticOrchestrator(client_manager=cm)
 ```
 
-Set `AZURE_AAIF_PROJECT_ENDPOINT` and optionally `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_SECRET` in your `.env` or environment before running.
+Set `AZURE_AAIF_PROJECT_ENDPOINT` in your `.env` before running. `AZURE_CLIENT_ID` and `AZURE_TENANT_ID` are optional for local dev (used by the UAMI in the cloud). `AZURE_CLIENT_SECRET` is only needed when using the manual-only `AZURE_AUTH_MODE=sp` local path — never set in CI or cloud environments.
 
 ## Code Validation
 ```powershell

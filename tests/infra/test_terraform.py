@@ -117,6 +117,68 @@ def test_mistral_models_present() -> None:
         assert dep in content, f"model_deployments default must include {dep}"
 
 
+# --- OIDC federated credential -------------------------------------------
+
+
+def test_federated_identity_credential_defined() -> None:
+    """CI authenticates via OIDC federation, not a stored secret (ADR-015)."""
+    content = MAIN_TF.read_text()
+    assert "azuread_application_federated_identity_credential" in content, (
+        "OIDC federated credential must be defined on the application"
+    )
+
+
+def test_oidc_issuer_github_actions() -> None:
+    content = MAIN_TF.read_text()
+    assert "https://token.actions.githubusercontent.com" in content, (
+        "OIDC issuer must be the GitHub Actions token endpoint"
+    )
+
+
+def test_oidc_subject_pull_request() -> None:
+    """OIDC subject must match the pull_request trigger used by infra-plan.yml.
+
+    GitHub issues sub=repo:...:pull_request for pull_request events and
+    sub=repo:...:ref:refs/heads/<branch> for push events — they are different
+    claims. Using the wrong subject causes Azure AD to reject the token exchange.
+    """
+    content = MAIN_TF.read_text()
+    assert "repo:ysuurme/azure_hello_world:pull_request" in content, (
+        "OIDC subject must be pull_request to match the infra-plan.yml pull_request trigger"
+    )
+
+
+def test_oidc_subject_consistent_with_workflow_trigger() -> None:
+    """Cross-validate: the registered OIDC subject must be compatible with the
+    event type that triggers infra-plan.yml, otherwise Azure AD will reject the
+    token exchange and every plan run will fail with a 401."""
+    workflow = Path(__file__).parent.parent.parent / ".github" / "workflows" / "infra-plan.yml"
+    tf_content = MAIN_TF.read_text()
+    wf_content = workflow.read_text(encoding="utf-8")
+    assert "pull_request" in wf_content, "infra-plan.yml must trigger on pull_request"
+    assert "repo:ysuurme/azure_hello_world:pull_request" in tf_content, (
+        "OIDC subject in main.tf must be pull_request to match the pull_request workflow trigger"
+    )
+
+
+# --- CI principal: Storage Blob Data Contributor on tfstate --------------
+
+
+def test_sp_tfstate_blob_contributor_defined() -> None:
+    """CI principal needs write on tfstate for blob-lease locking during terraform apply."""
+    content = MAIN_TF.read_text()
+    assert '"Storage Blob Data Contributor"' in content, (
+        "CI principal must be granted Storage Blob Data Contributor on the tfstate container"
+    )
+
+
+def test_sp_tfstate_platform_storage_referenced() -> None:
+    content = MAIN_TF.read_text()
+    assert "stplatformydev" in content, (
+        "Storage Blob Data Contributor grant must reference the platform state account stplatformydev"
+    )
+
+
 # --- Service Principal & RBAC --------------------------------------------
 
 

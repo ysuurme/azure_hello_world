@@ -77,8 +77,35 @@ resource "azuread_service_principal" "helloarch" {
 }
 
 # No client secret is provisioned: the app uses DefaultAzureCredential (az login
-# locally, UAMI in the cloud). A credential is attached later as an OIDC federated
-# identity for CI (ADR-015 fast-follow), never a long-lived secret in state.
+# locally, UAMI in the cloud). CI authenticates via the OIDC federated credential
+# below — a short-lived token exchange, never a long-lived secret in state (ADR-015).
+
+# --- OIDC federated credential for CI (GitHub Actions) ---
+# The GitHub Actions OIDC token is exchanged for an Azure access token without any
+# stored secret. Subject targets pull_request events because infra-plan.yml triggers
+# on pull_request (not push). GitHub issues sub=...pull_request for that event type;
+# ref:refs/heads/master would only match push-to-master triggers.
+resource "azuread_application_federated_identity_credential" "ci_oidc" {
+  application_id = azuread_application.helloarch.id
+  display_name   = "github-ci-pr"
+  audiences      = ["api://AzureADTokenExchange"]
+  issuer         = "https://token.actions.githubusercontent.com"
+  subject        = "repo:ysuurme/azure_hello_world:pull_request"
+}
+
+# --- RBAC: CI principal → tfstate container (state read + blob-lease locking) ---
+# Storage Blob Data Contributor (write) is required because terraform acquires a
+# blob lease on the state file to prevent concurrent apply corruption.
+data "azurerm_storage_account" "platform" {
+  name                = "stplatformydev"
+  resource_group_name = "rg-platformy-dev"
+}
+
+resource "azurerm_role_assignment" "sp_tfstate_blob_contributor" {
+  scope                = "${data.azurerm_storage_account.platform.id}/blobServices/default/containers/tfstate"
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azuread_service_principal.helloarch.object_id
+}
 
 # --- RBAC: SP → Foundry account (project ops + inference) ---
 resource "azurerm_role_assignment" "sp_ai_developer" {
