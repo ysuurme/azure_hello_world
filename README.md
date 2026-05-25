@@ -180,7 +180,7 @@ id-helloarch-api (UAMI) ──Azure AI Developer + Cognitive Services User──
 - **Foundry** — AIServices account + `helloarch` project + Mistral model deployments (`mistral-small-2503`, `Mistral-Large-3`, `Codestral-2501`).
 - **ACR** `crhelloarchdev` (admin disabled — pull via UAMI only).
 - **Backend Container App** `ca-helloarch-api` — internal ingress, runs the FastAPI image, identity = user-assigned `id-helloarch-api`. No public `/dispatch`.
-- **Identities & RBAC** — UAMI (AcrPull + Azure AI Developer + Cognitive Services User) and a Service Principal (`sp-helloarch-dev`) for local/SP auth.
+- **Identities & RBAC** — UAMI (AcrPull + Azure AI Developer + Cognitive Services User) and a **credential-less** Service Principal (`sp-helloarch-dev`): no client secret is provisioned (none in state). Local dev uses `az login`; a CI credential attaches later via OIDC federation (ADR-015 fast-follow).
 
 **Provider:** azurerm `~> 4.0` (validated on v4.74.0), azapi `~> 2.0`, azuread `~> 2.0`. Remote state in Azure Storage (ADR-015).
 
@@ -212,7 +212,7 @@ terraform apply
 az cognitiveservices account purge -g rg-helloarch-dev -n aaif-helloarch-dev -l swedencentral
 ```
 
-**Status:** Backend is deployed and validated end-to-end (`/healthz` → ok, `/diagram` → SVG via UAMI→Foundry).
+**Status:** Stack fully managed by Terraform with remote state as the source of truth; rebuilt clean (manual-bootstrap drift reconciled by destroy + recreate). Backend image deployed; the Container App runs **scaled-to-zero behind internal ingress** — first request cold-starts, and it is not publicly reachable. `/diagram` is fully functional; `/design` runs degraded pending ADR-016 (see interim note below). End-to-end runtime (`/healthz` → ok, `/diagram` → SVG via UAMI→Foundry) was validated on the equivalent pre-rebuild stack; re-validating the rebuilt stack requires reaching the internal FQDN from within the Container Apps environment.
 
 > **Caveat:** local `docker compose` may still run an image built before the Dockerfile `/app` permission fix (`chown` + switch user *after* COPYs). A `docker compose build` picks up the deterministic fix.
 
