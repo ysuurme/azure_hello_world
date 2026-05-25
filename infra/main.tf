@@ -82,14 +82,15 @@ resource "azuread_service_principal" "helloarch" {
 
 # --- OIDC federated credential for CI (GitHub Actions) ---
 # The GitHub Actions OIDC token is exchanged for an Azure access token without any
-# stored secret. Subject targets the master branch; tighten to an environment-scoped
-# subject if GitHub environment protection is adopted later.
+# stored secret. Subject targets pull_request events because infra-plan.yml triggers
+# on pull_request (not push). GitHub issues sub=...pull_request for that event type;
+# ref:refs/heads/master would only match push-to-master triggers.
 resource "azuread_application_federated_identity_credential" "ci_oidc" {
   application_id = azuread_application.helloarch.id
-  display_name   = "github-ci-master"
+  display_name   = "github-ci-pr"
   audiences      = ["api://AzureADTokenExchange"]
   issuer         = "https://token.actions.githubusercontent.com"
-  subject        = "repo:ysuurme/azure_hello_world:ref:refs/heads/master"
+  subject        = "repo:ysuurme/azure_hello_world:pull_request"
 }
 
 # --- RBAC: CI principal → tfstate container (state read + blob-lease locking) ---
