@@ -194,7 +194,7 @@ class TestMultiTurnGrillLoop:
                 t3 = module.handle("yes", t2.updated_state)
 
         assert t3.status == "completed"
-        assert t3.artifacts.get("d2") == "API -> Backend -> Database"
+        assert "API -> Backend -> Database" in t3.artifacts.get("d2")
         assert t3.artifacts.get("svg") == b"<svg bytes/>"
 
     def test_grill_turn_passes_original_description_as_context(self):
@@ -327,6 +327,9 @@ class TestApprovalGate:
 
         module._store.save.assert_called_once()
         assert result.artifacts.get("slug") == "api-system"
+        # The persisted D2 is self-contained: the house-style class preamble is prepended.
+        saved_d2 = module._store.save.call_args.args[1]
+        assert "classes:" in saved_d2 and "API -> DB" in saved_d2
 
     def test_happy_path_response_contains_d2(self):
         module = _make_module()
@@ -366,8 +369,8 @@ class TestApprovalGate:
         assert "svg" not in result.artifacts
 
 
-class TestSketchFlagForwarding:
-    def test_sketch_true_forwarded_to_engine(self):
+class TestStyleForwarding:
+    def test_style_forwarded_to_engine_with_sketch(self):
         module = _make_module()
 
         # First: grill completes → awaiting_approval
@@ -384,7 +387,7 @@ class TestSketchFlagForwarding:
 
         mock_engine.generate_svg.assert_called_once()
         _, kwargs = mock_engine.generate_svg.call_args
-        assert kwargs.get("sketch") is True
+        assert kwargs["style"].sketch is True
 
 
 class TestDiagramSubcommands:

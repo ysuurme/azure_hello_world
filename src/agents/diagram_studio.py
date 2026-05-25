@@ -9,6 +9,7 @@ from src.agents._refinement import RefinementMixin
 from src.config import AGENT_MODELS
 from src.utils.m_diagram_engine import DiagramEngine
 from src.utils.m_diagram_store import get_diagram_store, slugify
+from src.utils.m_diagram_style import get_diagram_style
 from src.utils.m_log import f_log
 from src.utils.m_persist_design import _brief_to_markdown
 
@@ -17,21 +18,10 @@ _D2_SYSTEM_PROMPT = (
     "polished D2. Return ONLY a single ```d2 ... ``` code block — no prose.\n\n"
     "Author it like a real architecture diagram, not a row of identical boxes:\n"
     "- Start with `direction: <layout_direction>`.\n"
-    "- GROUPING: when components share a `group`, nest them in a D2 container so you get blocks-in-blocks, "
-    'e.g.\n  ingress: "Ingress" {\n    gateway: "API Gateway"\n    auth: "Auth"\n  }\n'
-    "- PALETTE (not monochrome): define classes and tag each shape by role. Example:\n"
-    "  classes: {\n"
-    '    service: { style: { fill: "#e8f0fe"; stroke: "#1a73e8"; border-radius: 8 } }\n'
-    '    datastore: { shape: cylinder; style: { fill: "#fce8e6"; stroke: "#c5221f" } }\n'
-    '    queue: { shape: hexagon; style: { fill: "#fef7e0"; stroke: "#f9ab00" } }\n'
-    '    external: { style: { fill: "#f1f3f4"; stroke: "#5f6368"; stroke-dash: 3 } }\n'
-    "  }\n"
-    "  then `order_svc.class: service`, `db.class: datastore`, etc. Map the brief's `shape` and pick the "
-    "class that fits each component's role.\n"
-    "- RELATIONSHIPS: label every edge with what flows. Solid arrow for synchronous calls; dashed for "
-    'async/events, e.g. `services.order_svc -> bus.queue: emits { style.stroke-dash: 4 }`. ALWAYS '
-    "reference nested shapes by their FULL container path so edges connect the real nodes instead of "
-    "spawning new empty top-level ones.\n"
+    "- GROUP related components in D2 containers (blocks-in-blocks), e.g.\n"
+    '  ingress: "Ingress" {\n    gateway: "API Gateway"\n    auth: "Auth"\n  }\n'
+    "- Reference nested shapes by their FULL container path in relationships so edges connect the real "
+    "nodes instead of spawning new empty top-level ones.\n"
     "- Stay faithful to the brief — do NOT invent components that are not in it.\n"
     "- The output MUST compile as valid D2."
 )
@@ -133,6 +123,7 @@ class DiagramStudioModule(RefinementMixin):
     def __init__(self, client_manager) -> None:
         self._client_manager = client_manager
         self._store = None
+        self._style = get_diagram_style()
 
     def _get_store(self):
         if self._store is None:
@@ -264,14 +255,17 @@ class DiagramStudioModule(RefinementMixin):
 
     def _generate_diagram(self, brief: dict, module_state: dict) -> ModuleResponse:
         f_log("DiagramStudioModule: generating D2 from approved brief.", level="process")
-        d2_code = self._generate_d2_from_brief(brief, prior_d2=module_state.get("d2"))
-        if not d2_code:
+        d2_body = self._generate_d2_from_brief(brief, prior_d2=module_state.get("d2"))
+        if not d2_body:
             return ModuleResponse(
                 response_text="Could not generate D2 code from the brief. Please try again.",
                 updated_state=module_state,
                 status="error",
             )
-        svg_bytes = DiagramEngine().generate_svg(d2_code, sketch=True)
+        # Compose a self-contained diagram: prepend the house-style class preamble unless the body
+        # already carries one (e.g. on build-forward, where prior_d2 included it).
+        d2_code = d2_body if "classes:" in d2_body else f"{self._style.d2_preamble}\n{d2_body}"
+        svg_bytes = DiagramEngine().generate_svg(d2_code, style=self._style)
         artifacts: dict = {"d2": d2_code, "brief": brief}
         if svg_bytes:
             artifacts["svg"] = svg_bytes
@@ -290,7 +284,7 @@ class DiagramStudioModule(RefinementMixin):
         )
 
     def _generate_d2_from_brief(self, brief: dict, prior_d2: str | None = None) -> str | None:
-        prompt = f"{_D2_SYSTEM_PROMPT}\n\nBrief: {json.dumps(brief, default=str)}"
+        prompt = f"{_D2_SYSTEM_PROMPT}\n\n{self._style.conventions}\n\nBrief: {json.dumps(brief, default=str)}"
         if prior_d2:
             prompt += (
                 "\n\nThis diagram already exists. Update the following D2 to reflect the brief, "

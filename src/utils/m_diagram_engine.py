@@ -1,9 +1,13 @@
 import os
 import subprocess
 import tempfile
+from typing import TYPE_CHECKING
 
 from src.config import D2_BINARY_PATH
 from src.utils.m_log import f_log
+
+if TYPE_CHECKING:
+    from src.utils.m_diagram_style import DiagramStyle
 
 
 class DiagramEngine:
@@ -14,10 +18,15 @@ class DiagramEngine:
     def __init__(self, binary_path: str = None) -> None:
         self.binary_path = binary_path or D2_BINARY_PATH
 
-    def generate_svg(self, d2_syntax: str, sketch: bool = True) -> bytes | None:
+    def generate_svg(self, d2_syntax: str, style: "DiagramStyle | None" = None) -> bytes | None:
         """
-        Takes raw .d2 syntactical mapping, compiles it, and returns the SVG bytes.
+        Takes raw .d2 syntactical mapping, applies the standard's render config (sketch/theme/pad),
+        compiles it, and returns the SVG bytes. The class preamble is composed into d2_syntax by the
+        caller (so the stored/downloaded .d2 is self-contained); this method renders it as-is.
         """
+        from src.utils.m_diagram_style import get_diagram_style
+
+        style = style or get_diagram_style()
         f_log("Compiling D2 syntax to SVG via local binary.", level="process")
 
         # Use a secure temporary directory native to python
@@ -29,9 +38,12 @@ class DiagramEngine:
                 f.write(d2_syntax)
 
             try:
-                args = [self.binary_path, input_file, output_file]
-                if sketch:
+                args = [self.binary_path]
+                if style.sketch:
                     args.append("--sketch")
+                if style.theme is not None:
+                    args += ["--theme", str(style.theme)]
+                args += ["--pad", str(style.pad), input_file, output_file]
                 # Standard library boundary: invoke the static binary
                 subprocess.run(args, capture_output=True, text=True, check=True)
 
