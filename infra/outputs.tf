@@ -37,3 +37,8 @@ output "backend_internal_fqdn" {
   description = "Internal ingress FQDN of the backend Container App"
   value       = azurerm_container_app.api.ingress[0].fqdn
 }
+
+output "diagram_storage_account_name" {
+  description = "Project storage account for diagrams — set as AZURE_DIAGRAM_STORAGE_ACCOUNT"
+  value       = azurerm_storage_account.diagrams.name
+}

@@ -30,6 +30,12 @@ terraform {
 provider "azurerm" {
   features {}
 
+  # Use Entra ID (not account keys) for storage data-plane operations — required
+  # because our storage accounts set shared_access_key_enabled = false. The caller
+  # needs a "Storage Blob Data *" role; for the diagram account that is granted at
+  # RG scope as an operator bootstrap (the SP/UAMI app grants are in main.tf).
+  storage_use_azuread = true
+
   # Skip subscription-wide auto-registration (needs subscription-level perms and
   # can hang on API latency), but explicitly register exactly the namespaces this
   # stack uses. If the logged-in identity lacks /register/action, register them by

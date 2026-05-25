@@ -6,6 +6,11 @@ vars:
 
 tasks:
 
+  dev:
+    desc: "Run backend+frontend locally; fetches the SP secret from kv-platformy-dev at launch (ARGS pass to compose, e.g. -- -d)"
+    cmds:
+      - pwsh -NoProfile -File .github/scripts/dev-up.ps1 {{.CLI_ARGS}}
+
   setup:
     desc: "Bootstrap — run once to configure GitHub Project field IDs, labels, and environment"
     cmds:

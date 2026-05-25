@@ -46,7 +46,9 @@ The Streamlit chat is a thin surface that calls `WorkflowDispatcher.dispatch(use
 | Workflow Dispatcher | Component sitting between the chat UI and capability modules; parses slash commands and routes user input to the matching module (ADR-010). | Not the orchestrator — it does not drive a workflow itself, it only routes. |
 | Workflow Module / Capability Module | Self-contained capability registered with the dispatcher; implements `name`, `slash_command`, `description`, `handle()`. | Distinct from `agents/*` agent classes — a module *may use* one or more agents internally. |
 | Slash Command | User input starting with `/` that selects the active module (`/diagram`, `/design`, `/help`, `/exit`). | Not a shell command; parsed client-side by the dispatcher. |
-| Sketch Style | Native D2 `--sketch` rendering mode — hand-drawn aesthetic enforced at the binary-execution layer, independent of D2 source (ADR-011). | Not a D2 theme number; not a CSS class; not a prompt directive. |
+| Sketch Style | Native D2 `--sketch` rendering mode — hand-drawn aesthetic applied at the binary-execution layer, now sourced from the active `DiagramStyle` (no longer hard-coded). | Not a D2 theme number; not a CSS class; not a prompt directive. |
+| DiagramStyle | The diagram aesthetic standard (`utils.m_diagram_style`): engine config (sketch/theme/pad), a D2 `classes` preamble (service/datastore/queue/external/boundary), and generation conventions injected into the D2 prompt. One source of truth so every diagram shares a feel. | Not the D2 source; not per-diagram. In-repo default now, platform-storage-backed later. |
+| Diagram Store | Persistence for the diagram trio (`brief.json` + `source.d2` + `render.svg`) keyed by slug (`utils.m_diagram_store`): filesystem locally, Azure Blob (`sthelloarchdev/diagrams`, **project-scoped**) when configured. | Distinct from `m_persist_design` (the `/design` archive); distinct from platform/knowledge storage. |
 | DiagramBrief | Structured intent artefact produced by the Diagram Studio grill loop; the input to D2 code generation. | Distinct from Agent Briefs produced by the `refine` skill; distinct from the architecture markdown produced by the composer. |
 | Refinement Pattern | Grill-me protocol (codebase-first, always-recommend, no-branch-left-open, interface-first) applied to capability modules to produce a Brief artefact before generating the deliverable. | A reusable pattern extracted from the `refine` skill; not the skill itself. |
 | ModuleResponse | Return contract of `WorkflowModule.handle()`: `updated_state`, `response_text`, `artifacts`, `status`. | A typed record, not a free-form dict. |
@@ -56,10 +58,11 @@ The Streamlit chat is a thin surface that calls `WorkflowDispatcher.dispatch(use
 | Context | Owns | Does Not Own |
 |---------|------|--------------|
 | `workflow_dispatcher` | Slash-command parsing, module registry, session-state hand-off, `/help` and `/exit` meta-commands. | Module internals, LLM calls, rendering. |
-| `diagram_studio` | `DiagramBrief` schema, diagram refine-pattern grill loop, D2 code generation from approved brief, approval gate, diagram trio persistence. | D2 binary execution (→ `utils.m_diagram_engine`), LLM client management (→ `utils.m_ai_client`), workflow routing (→ `workflow_dispatcher`). |
+| `diagram_studio` | `DiagramBrief` schema, diagram refine-pattern grill loop, D2 generation from approved brief, approval gate, `DiagramStyle` preamble composition, `/diagram` subcommands, multi-session build-forward. | D2 binary execution (→ `utils.m_diagram_engine`), the aesthetic standard (→ `utils.m_diagram_style`), trio persistence (→ `utils.m_diagram_store`), LLM client management (→ `utils.m_ai_client`), workflow routing (→ `workflow_dispatcher`). |
 | `design_architecture` | Multi-turn architecture design (intake review → composer); cost-aware Maker-Checker loop. | Workflow routing (→ `workflow_dispatcher`), diagram styling (→ `diagram_studio` / `m_diagram_engine`). |
-| `utils.m_diagram_engine` | Safe execution of the D2 binary; sketch flag enforcement (`--sketch`). | D2 code generation, diagram intent. |
-| `utils.m_persist_design` | Filesystem persistence of approved artefacts — architecture markdown + SVG, and diagram trio (brief + d2 + svg). | The structure of the artefacts themselves. |
+| `utils.m_diagram_engine` | Safe execution of the D2 binary; applies the `DiagramStyle` render config (sketch/theme/pad). | D2 code generation, diagram intent, the aesthetic standard itself (→ `m_diagram_style`). |
+| `utils.m_diagram_store` | Persistence + retrieval of the diagram trio keyed by slug; filesystem or Azure Blob (project-scoped, `sthelloarchdev/diagrams`). | Diagram generation, styling, the storage account's provisioning (→ `infra/`). |
+| `utils.m_persist_design` | Filesystem/blob persistence of approved `/design` artefacts — architecture markdown + SVG. | The structure of the artefacts; diagram-trio persistence (→ `m_diagram_store`). |
 
 ---
 
@@ -79,7 +82,9 @@ Use this module map to pinpoint the relevant files for your task and avoid loadi
 | `ui.app` | 0 | 9 | deep module | Streamlit frontend for the Maker-Checker conversation loop. |
 | `utils.m_ai_client` | 0 | 4 | deep module | Manages `DefaultAzureCredential` and instantiates connections to Azure AI Foundry models. |
 | `utils.m_capability_repo` | 0 | 4 | deep module | Parses markdown/YAML capability records from local storage. |
-| `utils.m_diagram_engine` | 0 | 5 | deep module | Bridges Composer markdown to D2 diagram syntax and SVGs. |
+| `utils.m_diagram_engine` | 1 (`diagram_studio`) | 3 | deep module | Renders raw D2 to SVG via the D2 binary, applying the active `DiagramStyle` render config (`--sketch`/`--theme`/`--pad`). |
+| `utils.m_diagram_style` | 2 (`diagram_studio`, `m_diagram_engine`) | 0 | deep module | The diagram aesthetic standard: `DiagramStyle` (sketch/theme/pad, D2 `classes` preamble, generation conventions). In-repo default now; platform-storage-backed later. |
+| `utils.m_diagram_store` | 2 (`diagram_studio`, `main`) | 2 | deep module | Persists the diagram trio (brief + d2 + svg) keyed by slug; filesystem store locally, Azure Blob (`sthelloarchdev/diagrams`) when configured. Enables multi-session build-forward. (ADR-016) |
 | `utils.m_health_check` | 0 | 4 | deep module | Validates environment, credentials, and API readiness. |
 | `utils.m_ingest` | 0 | 2 | deep module | Idempotent RAG ingestion pipeline via Azure AI Search. |
 | `utils.m_log` | 0 | 4 | deep module | Centralized logging and telemetry wrapping. |
@@ -87,7 +92,7 @@ Use this module map to pinpoint the relevant files for your task and avoid loadi
 | `utils.m_search` | 0 | 1 | deep module | Abstraction for executing semantic queries against AI Search. |
 | `utils.m_tools` | 0 | 2 | deep module | Function calling capabilities for agents (e.g., `calculate_cost`). |
 | `agents.workflow_dispatcher` | 1 (`ui.app`) | 2+ | deep module | Slash-command parser and capability-module router; sole entry point from `ui.app`. (ADR-010) |
-| `agents.diagram_studio` | 1 (`workflow_dispatcher`) | 4 | deep module | Diagram capability module: grill loop → DiagramBrief → D2 → sketch-rendered SVG. (ADR-011) |
+| `agents.diagram_studio` | 1 (`workflow_dispatcher`) | 6 | deep module | Diagram capability module: grill loop → DiagramBrief → D2 → SVG, plus `/diagram list\|open\|delete` and multi-session build-forward. Composes the `DiagramStyle` class preamble and persists the trio via `m_diagram_store`. (ADR-011, ADR-016) |
 | `agents._refinement` | 1 (`diagram_studio`) | 0 | deep module | RefinementMixin encoding the grill pattern: read known → identify gaps → emit questions with recommendations. |
 | `agents.design_architecture` | 1 (`workflow_dispatcher`) | 5 (`intake_reviewer`, `architecture_composer`, `utils.m_diagram_engine`, `utils.m_persist_design`, `utils.m_ai_client`) | deep module | Owns the `/design` lifecycle: intake review → composer → SVG render → archive. (ADR-010) |
 
@@ -98,8 +103,10 @@ Use this module map to pinpoint the relevant files for your task and avoid loadi
 | Adding a new capability module | `docs/adr/ADR-010-workflow-dispatcher.md`, `docs/adr/ADR-011-diagram-studio-sketch.md` (reference implementation), `src/agents/workflow_dispatcher.py`, `src/agents/diagram_studio.py` |
 | Changing dispatch / slash-command behaviour | `docs/adr/ADR-010-workflow-dispatcher.md`, `src/agents/workflow_dispatcher.py`, `tests/agents/test_workflow_dispatcher.py` |
 | Changing diagram rendering / sketch behaviour | `docs/adr/ADR-011-diagram-studio-sketch.md`, `src/utils/m_diagram_engine.py`, `src/agents/diagram_studio.py` |
+| Changing diagram aesthetics (palette, shapes, conventions, theme) | `src/utils/m_diagram_style.py`, `src/agents/diagram_studio.py` (`_D2_SYSTEM_PROMPT`) |
 | Changing architecture-design flow (intake → composer) | `src/agents/design_architecture.py`, `src/agents/intake_reviewer.py`, `src/agents/architecture_composer.py` |
-| Persistence of designs / diagrams | `src/utils/m_persist_design.py`, `src/config.py` (`DESIGNS_ARCHIVE_DIR`) |
+| Persistence of `/design` artefacts | `src/utils/m_persist_design.py`, `src/config.py` (`DESIGNS_ARCHIVE_DIR`) |
+| Persistence of diagrams (multi-session, blob) | `src/utils/m_diagram_store.py`, `src/config.py` (`DIAGRAM_STORAGE_ACCOUNT`, `DIAGRAM_CONTAINER`), `docs/adr/ADR-016-externalize-knowledge-to-cloud-storage.md` |
 
 ## Architectural Constraints
 
@@ -107,7 +114,8 @@ Invariants that must not be violated in any implementation.
 
 - **Workflow modules must not call each other directly** — composition flows through the dispatcher (ADR-010).
 - **Slash commands are the only routing primitive in v1** — no LLM intent classifier (ADR-010).
-- **Sketch enforcement is engine-level** — module code does not pass D2 styling directives; the engine appends `--sketch` (ADR-011).
+- **Diagram aesthetics flow from one `DiagramStyle` standard** — sketch/theme/pad and the D2 `classes` preamble come from `m_diagram_style`, never hard-coded in the engine or freestyled per diagram (ADR-011).
+- **Diagrams are project-scoped storage, not platform** — the trio persists to `sthelloarchdev` in `rg-helloarch-dev` and dies with the RG; platform storage holds only cross-board knowledge (capabilities, ADRs, validated patterns) (ADR-016 amendment).
 - **The refine pattern is reused as a thin mixin / shared protocol, not a re-run of the full refine skill** — diagrams produce a `DiagramBrief`, not a full Agent Brief + CONTEXT.md updates (ADR-011).
 - **Module Map and Issue-Type Index updates ship in the same PR as the new module** — blocking ship gate (ADR-009).
 

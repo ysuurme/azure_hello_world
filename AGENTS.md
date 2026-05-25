@@ -53,7 +53,7 @@ Invoke the relevant skill in `.agents/skills/` before implementing manually.
 | `src/tools/` | Developer utilities |
 | `tests/` | Pytest suite, mirrors `src/` and `tools/` hierarchy |
 | `.agents/skills/` | Skill system instructions |
-| `infra/` | Terraform IaC for the Azure cloud backend (ACR + UAMI + Container Apps + Foundry). azurerm `~> 4.0`; remote state in the shared platform account `stplatformydev` (ADR-015). |
+| `infra/` | Terraform IaC for the Azure cloud backend (ACR + UAMI + Container Apps + Foundry + project diagram storage `sthelloarchdev`). azurerm `~> 4.0`; remote state in the shared platform account `stplatformydev`; secrets via the central platform Key Vault `kv-platformy-dev` (3-tier identity: host=`az login`, local container=SP secret, CI=OIDC, cloud=UAMI) (ADR-015, ADR-016). |
 | `docs/adr/` | Architecture Decision Records |
 | `CONTEXT.md` | Repo-structure doc — domain glossary, Module Map, architectural constraints |
 | `.github/workflows/` | CI: lint + test |

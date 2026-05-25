@@ -5,6 +5,11 @@ services:
     ports:
       - "8000:8000"
     env_file: .env
+    environment:
+      # Injected from kv-platformy-dev at launch by `task dev` (dev-up.ps1); never stored on disk.
+      # Defaults to empty so `down`/`ps`/`logs` work without it; if you `up` without the
+      # secret the backend fails fast at startup ("missing env vars: AZURE_CLIENT_SECRET").
+      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
       interval: 30s

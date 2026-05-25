@@ -19,7 +19,8 @@ AZURE_AAIF_PROJECT_ENDPOINT = os.getenv("AZURE_AAIF_PROJECT_ENDPOINT")
 AGENT_MODELS = {
     "intake_reviewer": "mistral-small-2503",
     "architecture_composer": "Mistral-Large-3",
-    "diagram_studio": "Codestral-2501",
+    "diagram_grill": "Mistral-Large-3",  # critical requirements review — reasoning model
+    "diagram_studio": "Codestral-2501",  # D2 code emission — code model
 }
 
 # --- Architecture RAG & Design ---
@@ -30,6 +31,14 @@ DESIGNS_ARCHIVE_DIR = (
     if SECOND_BRAIN_PATH
     else PROJECT_ROOT / "designs" / "approved"
 )
+
+# --- Diagram store (project-scoped working artifacts; ADR-016 project-local) ---
+# When AZURE_DIAGRAM_STORAGE_ACCOUNT is set, diagrams persist to Azure Blob
+# (container AZURE_DIAGRAM_CONTAINER) via DefaultAzureCredential. When unset the
+# store falls back to the local filesystem (CI / offline dev).
+DIAGRAM_STORAGE_ACCOUNT = os.getenv("AZURE_DIAGRAM_STORAGE_ACCOUNT")
+DIAGRAM_CONTAINER = os.getenv("AZURE_DIAGRAM_CONTAINER", "diagrams")
+DIAGRAM_STORE_DIR = PROJECT_ROOT / "designs" / "diagrams"
 
 # --- Executable Engines ---
 D2_BINARY_PATH = os.environ.get("D2_BINARY_PATH", "d2")

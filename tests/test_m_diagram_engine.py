@@ -11,8 +11,8 @@ class TestDiagramEngine:
         engine = DiagramEngine()
 
         def mock_subprocess_run(cmd, *args, **kwargs):
-            # cmd is [self.binary_path, input_file, output_file]
-            output_file = cmd[2]
+            # cmd ends with [..., input_file, output_file]; output is the last arg
+            output_file = cmd[-1]
             with open(output_file, "wb") as f:
                 f.write(b'<svg xmlns="http://www.w3.org/2000/svg"><text>User</text><text>Agent</text></svg>')
             mock_result = MagicMock()

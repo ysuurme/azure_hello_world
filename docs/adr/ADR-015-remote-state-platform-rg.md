@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — OIDC fast-follow completed in issue #68
+Accepted — OIDC fast-follow completed in issue #68. **Amended 2026-05-25** — a central platform Key Vault (`kv-platformy-dev`) is now provisioned in `rg-platformy-dev`, and local *container* dev authenticates as the scoped Service Principal using a client secret stored there. See the [Amendment](#amendment-2026-05-25-central-platform-key-vault--local-container-workload-identity) section. The no-secret-in-state invariant is preserved (the SP secret is created outside Terraform via `az` and never enters state).
 
 ## Context and Problem Statement
 
@@ -26,10 +26,10 @@ Chosen: **Option B — a shared platform resource group `rg-platformy-dev` holdi
 
 The platform RG is long-lived and project-agnostic: one state account backs every project, surviving any single project's teardown. This preserves ADR-013's clean-teardown invariant and matches the production pattern (consolidated state estate), advancing the project's learning objective rather than working against it.
 
-**Secrets stance: harden the backend; do not introduce Key Vault for this concern.** The load-bearing insight is that *anything Terraform manages lands in state in plaintext* — so Key Vault as a write destination does not remove a Terraform-generated secret from state. Key Vault is therefore not a solution to secret-in-state and is deferred until a genuine runtime secret (one that managed identity cannot cover) exists, consistent with [ADR-008](ADR-008-secrets-management.md) designating Key Vault as the production-corporate store.
+**Secrets stance: keep secrets out of Terraform state.** The load-bearing insight is that *anything Terraform manages lands in state in plaintext* — so Key Vault as a write destination does not remove a *Terraform-generated* secret from state. ~~Key Vault is therefore not a solution to secret-in-state and is deferred until a genuine runtime secret (one that managed identity cannot cover) exists~~ — **superseded by the [2026-05-25 Amendment](#amendment-2026-05-25-central-platform-key-vault--local-container-workload-identity):** Key Vault is now introduced, but the invariant still holds because the SP secret is generated *outside* Terraform (via `az`) and stored in Key Vault, so it never enters state. Consistent with [ADR-008](ADR-008-secrets-management.md) designating Key Vault as the production-corporate store.
 
 Instead, in priority order:
-1. **Eliminate secrets** — the cloud path is already secretless via managed identity (UAMI → ACR + Foundry); local dev uses `az login` + `DefaultAzureCredential`. The optional Service Principal password has been removed; CI authenticates via OIDC workload-identity federation (completed in issue #68, superseding the SP-password portion of ADR-013). `AZURE_AUTH_MODE=sp` is retained solely as a **manual-only local path** — `AZURE_CLIENT_SECRET` is never stored in Terraform state or injected into CI or cloud environments.
+1. **Eliminate secrets** — the cloud path is already secretless via managed identity (UAMI → ACR + Foundry); local *native* dev uses `az login` + `DefaultAzureCredential`. The optional Service Principal password has been removed; CI authenticates via OIDC workload-identity federation (completed in issue #68, superseding the SP-password portion of ADR-013). `AZURE_AUTH_MODE=sp` is retained ~~solely as a **manual-only local path**~~ **(Amended 2026-05-25: now the standard path for local *container* dev — see Amendment)** — `AZURE_CLIENT_SECRET` is never stored in Terraform state or injected into CI or cloud environments; for local containers it lives in `kv-platformy-dev` and is injected at launch.
 2. **Harden the state backend** (this ADR) — RBAC/Entra-only (`--allow-shared-key-access false`, `use_azuread_auth = true`), no public blob access, blob versioning + soft-delete for recovery. Encryption at rest is on by default. This protects the residual secrets that always leak into state.
 
 ### Positive Consequences
@@ -44,6 +44,39 @@ Instead, in priority order:
 - A one-time manual bootstrap (`az` commands in README) is required before `terraform init -migrate-state`, since the backend cannot provision the account it depends on (chicken-and-egg).
 - The platform RG/account is now a shared dependency whose deletion would affect every project's state — it must be treated as protected infrastructure.
 - ~~Secrets still reside in state until the SP-password elimination fast-follow lands; backend hardening is the interim mitigation.~~ Resolved in issue #68: the SP password was removed and CI now uses OIDC federation; no extractable secret lands in state.
+
+## Amendment (2026-05-25): central platform Key Vault + local-container workload identity
+
+Two decisions that **extend** this ADR without breaching its core invariant.
+
+### What changed
+
+1. **A central platform Key Vault `kv-platformy-dev`** is provisioned in `rg-platformy-dev` (RBAC authorization mode), mirroring the `stplatformydev` tfstate pattern: one project-agnostic vault serving every project, long-lived, surviving any single project's teardown. This realizes [ADR-008](ADR-008-secrets-management.md)'s designation of Azure Key Vault as the corporate secrets store.
+2. **Local *container* dev authenticates as the scoped Service Principal** (`sp-helloarch-dev`), not via the developer's `az login`. A client secret is provisioned on the SP and stored as `helloarch-sp-client-secret`. `task dev` (`.github/scripts/dev-up.ps1`) uses the developer's `az login` (granted **Key Vault Secrets Officer**) to fetch the secret and inject it into the container environment at launch; the running container uses `EnvironmentCredential` and never depends on `az login`.
+
+### Why the deferral trigger is now met
+
+The original stance deferred Key Vault until "a genuine runtime secret that managed identity cannot cover exists." That condition now holds: a laptop has no managed-identity metadata endpoint, so a local container cannot use a managed identity. To give the local container a **workload** identity — scoped RBAC, production parity with the cloud UAMI — rather than borrowing the developer's full-permission `az login`, a Service Principal client secret is unavoidable, and that is precisely a runtime secret MI cannot cover. Genuine app secrets (`anthropic-api-key`, `gh-token`) reinforce the need for the vault.
+
+### Why the no-secret-in-state invariant still holds
+
+The SP secret is generated **outside Terraform** via `az ad app credential reset` and written straight to Key Vault. Terraform manages the SP *application* but **not** its credentials (no `azuread_application_password` resource), so the secret never enters Terraform state. The hardened-backend rationale above is unaffected.
+
+### Resulting identity model
+
+| Context | Identity to Foundry | Secret |
+|---|---|---|
+| Native dev (no container) | `az login` → DefaultAzureCredential | none |
+| Local container (`task dev`) | Service Principal via `EnvironmentCredential` | SP secret, from `kv-platformy-dev`, injected at launch |
+| CI (GitHub Actions) | Service Principal via OIDC federation | none |
+| Cloud Container App | UAMI (managed identity) | none |
+
+One code path — `DefaultAzureCredential()` — resolves the environment-appropriate identity in every context; only the credential *source* differs.
+
+### RBAC on the vault
+
+- Developer (`az login`) → **Key Vault Secrets Officer** (create/manage secret values).
+- SP and cloud UAMI → **Key Vault Secrets User** (read app secrets at runtime). The SP cannot read its *own* bootstrap secret (it needs the secret to authenticate), so that one value is launch-injected; all other app secrets are read at runtime. This read role is assigned when the first such app secret is stored.
 
 ## Pros and Cons of the Options
 
