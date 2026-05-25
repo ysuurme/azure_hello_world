@@ -208,6 +208,10 @@ resource "azurerm_container_app" "api" {
         name  = "AZURE_CLIENT_ID"
         value = azurerm_user_assigned_identity.api.client_id
       }
+      env {
+        name  = "AZURE_DIAGRAM_STORAGE_ACCOUNT"
+        value = azurerm_storage_account.diagrams.name
+      }
     }
   }
 
@@ -217,3 +221,64 @@ resource "azurerm_container_app" "api" {
     azurerm_role_assignment.api_cognitive_user,
   ]
 }
+
+# --- Project storage: diagram working artifacts (ADR-016 project-local) ---
+# Lives in rg-helloarch-dev (NOT the platform account): diagrams are project-scoped
+# working artifacts, not cross-project knowledge. Accepted trade-off — this account
+# is destroyed by `az group delete rg-helloarch-dev` (ADR-013 teardown).
+resource "azurerm_storage_account" "diagrams" {
+  name                = var.diagram_storage_account_name
+  resource_group_name = azurerm_resource_group.helloarch.name
+  location            = azurerm_resource_group.helloarch.location
+
+  account_tier             = "Standard"
+  account_replication_type = "LRS" # cheapest; single-region is fine for project working artifacts
+  account_kind             = "StorageV2"
+  access_tier              = "Hot"
+
+  # Secretless, hardened (mirrors the state-account stance in ADR-015).
+  shared_access_key_enabled       = false # Entra ID only — no account keys
+  https_traffic_only_enabled      = true
+  min_tls_version                 = "TLS1_2"
+  public_network_access_enabled   = true # dev: reachable from laptop; tighten with Private Link later (#10)
+  allow_nested_items_to_be_public = false
+
+  blob_properties {
+    versioning_enabled = true # "blob is the version control" (ADR-016) — history for build-forward
+    delete_retention_policy {
+      days = 14 # soft-delete blobs (recover deleted diagrams)
+    }
+    container_delete_retention_policy {
+      days = 7
+    }
+  }
+}
+
+# Container created via the MANAGEMENT plane (storage_account_id) so it works with
+# account keys disabled, using your Owner rights rather than a data-plane key.
+resource "azurerm_storage_container" "diagrams" {
+  name                  = var.diagram_container_name
+  storage_account_id    = azurerm_storage_account.diagrams.id
+  container_access_type = "private"
+}
+
+# --- Data-plane RBAC (no keys): who can read/write blobs ---
+# SP (local container dev) — read/write so the local app persists diagrams.
+resource "azurerm_role_assignment" "sp_diagrams_blob" {
+  scope                = azurerm_storage_account.diagrams.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azuread_service_principal.helloarch.object_id
+}
+
+# UAMI (cloud Container App) — read/write so the deployed app persists diagrams.
+resource "azurerm_role_assignment" "api_diagrams_blob" {
+  scope                = azurerm_storage_account.diagrams.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.api.principal_id
+}
+
+# Note: the operator (your az login) holds "Storage Blob Data Contributor" at
+# rg-helloarch-dev scope, granted out-of-band as a bootstrap (mirrors the KV
+# Secrets Officer grant). It must pre-exist so the provider's AAD blob-service
+# poll on account creation is authorized — RBAC created mid-apply propagates too
+# late. Hence it is intentionally not declared here.

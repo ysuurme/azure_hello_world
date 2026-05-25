@@ -58,6 +58,18 @@ variable "backend_app_name" {
   default     = "ca-helloarch-api"
 }
 
+variable "diagram_storage_account_name" {
+  type        = string
+  description = "Project storage account for diagram working artifacts (CAF: st<workload><env>, no hyphens, 3-24 lowercase alphanumeric, globally unique)"
+  default     = "sthelloarchdev"
+}
+
+variable "diagram_container_name" {
+  type        = string
+  description = "Blob container holding the per-diagram trio (brief.json + source.d2 + render.svg)"
+  default     = "diagrams"
+}
+
 variable "image_tag" {
   type        = string
   description = "Tag of the helloarch backend image to deploy. CD should pass the git SHA so revisions are deterministic; 'latest' is a local-dev fallback only."
