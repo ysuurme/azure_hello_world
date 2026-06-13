@@ -18,30 +18,61 @@ from dataclasses import dataclass
 # redefine them (kept here so the palette is identical across all diagrams).
 _DEFAULT_PREAMBLE = """\
 classes: {
-  service: { style: { fill: "#e8f0fe"; stroke: "#1a73e8"; border-radius: 8 } }
-  datastore: { shape: cylinder; style: { fill: "#fce8e6"; stroke: "#c5221f" } }
-  queue: { shape: hexagon; style: { fill: "#fef7e0"; stroke: "#f9ab00" } }
-  external: { style: { fill: "#f1f3f4"; stroke: "#5f6368"; stroke-dash: 3 } }
-  boundary: { style: { fill: "transparent"; stroke: "#9aa0a6"; stroke-dash: 4; border-radius: 12 } }
+  person:   { shape: person;   style: { fill: "#e3f2fd"; stroke: "#1565c0" } }
+  service:  { style: { fill: "#f3e5f5"; stroke: "#7b1fa2"; border-radius: 8 } }
+  cylinder: { shape: cylinder; style: { fill: "#e8f5e9"; stroke: "#2e7d32" } }
+  datastore: { shape: cylinder; style: { fill: "#e8f5e9"; stroke: "#2e7d32" } }
+  queue:    { shape: queue;    style: { fill: "#f3e5f5"; stroke: "#6a1b9a" } }
+  cloud:    { shape: cloud;    style: { fill: "#f5f5f5"; stroke: "#616161" } }
+  external: { style: { fill: "#f5f5f5"; stroke: "#616161"; stroke-dash: 3 } }
+  hexagon:  { shape: hexagon;  style: { fill: "#f3e5f5"; stroke: "#4527a0" } }
+  document: { shape: page;     style: { fill: "#e8f5e9"; stroke: "#388e3c" } }
+  security: { style: { fill: "#fff8e1"; stroke: "#f57f17" } }
+  boundary: { style: { fill: "transparent"; stroke: "#9aa0a6"; stroke-dash: 4; border-radius: 12; opacity: 0.4 } }
 }
 """
 
 _DEFAULT_CONVENTIONS = (
-    "House style — these D2 classes are ALREADY DEFINED elsewhere; do NOT emit a `classes:` block, but you "
-    "MUST tag EVERY shape with the class that fits its role using `<shape>.class: <name>`:\n"
-    "- service: application / compute components\n"
-    "- datastore: databases and persistent stores\n"
-    "- queue: brokers, topics, event buses\n"
-    "- external: third-party / out-of-scope systems\n"
-    "- boundary: a container used for a trust/network boundary or logical group\n"
-    "Example (note every shape is tagged):\n"
-    '  services: "Services" {\n'
-    '    order_svc: "Order Service"; order_svc.class: service\n'
-    '    db: "Orders DB"; db.class: datastore\n'
+    "House style — classes ARE ALREADY DEFINED in the preamble; do NOT emit a `classes:` block.\n"
+    "Tag EVERY shape with its class using `<id>.class: <name>`.\n\n"
+    "SHAPE SELECTION — pick the class whose role matches:\n"
+    "  IF actor / client / user / browser / mobile app         → class: person\n"
+    "  IF application service / API / microservice / UI layer  → class: service\n"
+    "  IF database / cache / object store / persistent storage → class: cylinder\n"
+    "  IF message broker / event bus / stream / pub-sub topic  → class: queue\n"
+    "  IF external SaaS / third-party / out-of-scope system    → class: cloud\n"
+    "  IF serverless function / lambda / ephemeral worker      → class: hexagon\n"
+    "  IF log / config file / manifest / schema / artifact     → class: document\n"
+    "  IF identity provider / auth service / firewall / WAF    → class: security\n"
+    "  IF trust zone / network boundary / logical group (container) → class: boundary\n\n"
+    "FILL COLOUR — applied automatically by class, do NOT override:\n"
+    "  ingress/public (#e3f2fd)        : person\n"
+    "  compute/app (#f3e5f5)           : service, hexagon, queue\n"
+    "  stateful storage (#e8f5e9)      : cylinder, document\n"
+    "  security/identity (#fff8e1)     : security\n"
+    "  external/untrusted (#f5f5f5)    : cloud, external\n\n"
+    "CONTAINMENT:\n"
+    "  Wrap every trust zone or network segment in a boundary-classed container.\n"
+    "  boundary containers use stroke-dash and opacity: 0.4 — enclosed shapes stay focal.\n\n"
+    "EDGE RULES (all mandatory):\n"
+    "  Every edge MUST carry a label (protocol, event name, or payload type).\n"
+    "  Primary synchronous path        : style.stroke-width: 3\n"
+    "  Async / event-driven flow       : style.stroke-dash: 4\n"
+    "  Streaming / WebSocket / replication: animated: true\n"
+    "  One-to-many cardinality         : target-arrowhead.shape: cf-many\n\n"
+    "MULTIPLE FLAG:\n"
+    "  Set `<id>.multiple: true` for any scaled / replicated / pooled component.\n\n"
+    "EXAMPLE (three shapes, three fills, labelled edges):\n"
+    '  region: "Azure Region" {\n'
+    "    class: boundary\n"
+    '    gw: "API Gateway"; gw.class: service\n'
+    '    svc: "Order Service"; svc.class: service\n'
+    '    db: "Orders DB"; db.class: cylinder\n'
     "  }\n"
-    "Conventions: group related components inside containers (blocks-in-blocks); use a `boundary`-classed "
-    "container for trust/network zones; reference nested shapes by full path in edges; label every edge "
-    "with what flows; solid arrows for sync, dashed (`style.stroke-dash: 4`) for async/events."
+    '  user: "Client"; user.class: person\n'
+    '  user -> region.gw: "HTTPS" { style.stroke-width: 3 }\n'
+    '  region.gw -> region.svc: "REST" { style.stroke-width: 3 }\n'
+    '  region.svc -> region.db: "SQL" { style.stroke-width: 3 }'
 )
 
 
