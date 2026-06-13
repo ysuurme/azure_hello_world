@@ -23,7 +23,30 @@ _D2_SYSTEM_PROMPT = (
     "- Reference nested shapes by their FULL container path in relationships so edges connect the real "
     "nodes instead of spawning new empty top-level ones.\n"
     "- Stay faithful to the brief — do NOT invent components that are not in it.\n"
-    "- The output MUST compile as valid D2."
+    "- The output MUST compile as valid D2.\n\n"
+    "## Anchor Example — pattern-complete against this known-good blueprint\n\n"
+    "```d2\n"
+    "direction: right\n\n"
+    "# glob base style — defined once at the top; override selectively per node\n"
+    "*.style.border-radius: 8\n\n"
+    'internet: "Internet" { class: external }\n\n'
+    'ingress: "Ingress Layer" {\n'
+    "  class: boundary\n\n"
+    '  api_gw: "API Gateway" { class: service }\n\n'
+    '  auth_svc: "Auth Service" {\n'
+    "    class: service\n"
+    '    style.fill: "#d0e8ff"\n'
+    "  }\n"
+    "}\n\n"
+    'order_svc: "Order Service" { class: service }\n'
+    'event_bus: "Order Events" { class: queue }\n'
+    'orders_db: "Orders DB" { class: datastore }\n\n'
+    'internet -> ingress.api_gw: "HTTPS"\n'
+    'ingress.api_gw -> ingress.auth_svc: "validate token"\n'
+    'ingress.api_gw -> order_svc: "route request"\n'
+    'order_svc -> event_bus: "publish event" { style.stroke-dash: 4 }\n'
+    'order_svc -> orders_db: "persist"\n'
+    "```"
 )
 
 _D2_PATTERN = re.compile(r"```d2\n(.*?)```", re.DOTALL)

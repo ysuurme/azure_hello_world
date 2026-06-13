@@ -69,10 +69,12 @@ _DEFAULT_CONVENTIONS = (
     '    svc: "Order Service"; svc.class: service\n'
     '    db: "Orders DB"; db.class: cylinder\n'
     "  }\n"
-    '  user: "Client"; user.class: person\n'
-    '  user -> region.gw: "HTTPS" { style.stroke-width: 3 }\n'
-    '  region.gw -> region.svc: "REST" { style.stroke-width: 3 }\n'
-    '  region.svc -> region.db: "SQL" { style.stroke-width: 3 }'
+    "Conventions: group related components inside containers (blocks-in-blocks); use a `boundary`-classed "
+    "container for trust/network zones; reference nested shapes by full path in edges; label every edge "
+    "with what flows; solid arrows for sync, dashed (`style.stroke-dash: 4`) for async/events.\n"
+    "Direction selection: use `direction: right` for temporal/streaming/pipeline flows (data moves left to "
+    "right through stages); use `direction: down` for multi-tier infrastructure stacks (client → gateway → "
+    "service → data tiers layered top to bottom)."
 )
 
 
@@ -82,6 +84,7 @@ class DiagramStyle:
     sketch: bool = True
     theme: int | None = 0  # D2 theme id; 0 = neutral so the explicit palette dominates
     pad: int = 20
+    layout_engine: str = "elk"
     d2_preamble: str = _DEFAULT_PREAMBLE
     conventions: str = _DEFAULT_CONVENTIONS
 
