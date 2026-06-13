@@ -43,7 +43,9 @@ class DiagramEngine:
                     args.append("--sketch")
                 if style.theme is not None:
                     args += ["--theme", str(style.theme)]
-                args += ["--pad", str(style.pad), input_file, output_file]
+                args += ["--pad", str(style.pad)]
+                args += ["--layout", style.layout_engine]
+                args += [input_file, output_file]
                 # Standard library boundary: invoke the static binary
                 subprocess.run(args, capture_output=True, text=True, check=True)
 
